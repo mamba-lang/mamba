@@ -103,10 +103,13 @@ class Lexer(object):
                     fraction = self.take_while(str.isdigit)
                     number += '.' + fraction
                     kind = TokenKind.float_
+                    value = float(number)
+                else:
+                    value = int(number)
                 yield Token(
                     kind=kind,
                     source_range=SourceRange(start=start, end=self.location),
-                    value=number)
+                    value=value)
                 continue
 
             # Check for identifiers.
@@ -114,7 +117,8 @@ class Lexer(object):
                 string = self.take_while(is_alnum_or_underscore)
                 source_range = SourceRange(start=start, end=self.location)
                 if string in { 'true', 'false' }:
-                    yield Token(kind=TokenKind.boolean, source_range=source_range, value=string)
+                    value = string == 'true'
+                    yield Token(kind=TokenKind.boolean, source_range=source_range, value=value)
                 elif string in reserved_keywords:
                     yield Token(kind=reserved_keywords[string], source_range=source_range)
                 else:
