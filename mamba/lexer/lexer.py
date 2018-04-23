@@ -89,7 +89,8 @@ class Lexer(object):
 
             # Ignore comments.
             if char == '#':
-                self.skip_while(lambda c: c == '\n')
+                self.skip_while(lambda c: c != '\n')
+                continue
 
             start = self.location
 
