@@ -163,6 +163,19 @@ class ElseCase(Node):
         return f'else {self.body}'
 
 
+class Binding(Node):
+
+    def __init__(self, name: str, annotation: Node, source_range: SourceRange):
+        super().__init__(source_range)
+        self.name = name
+        self.annotation = annotation
+
+    def __str__(self) -> str:
+        if self.annotation is not None:
+            return f'let {self.name}: {self.annotation}'
+        return f'let {self.name}'
+
+
 class Identifier(Node):
 
     def __init__(self, name: str, specializers: list, source_range: SourceRange):

@@ -236,6 +236,11 @@ class Parser(object):
             source_range=SourceRange(start=name_token.source_range.start, end=end))
 
     def parse_expression(self) -> node.Node:
+        # Attempt to parse a binding.
+        if self.peek().kind == TokenKind.let:
+            return self.parse_binding()
+
+        # Attempt to parse a term.
         left = self.attempt(self.parse_closure_expression) or self.parse_atom()
 
         # Attempt to parse the remainder of an infix expression.
@@ -278,6 +283,32 @@ class Parser(object):
             continue
 
         return left
+
+    def parse_binding(self) -> node.Binding:
+        start_token = self.consume(TokenKind.let)
+        if start_token is None:
+            raise self.unexpected_token(expected='let')
+
+        # Parse the name of the binding.
+        self.consume_newlines()
+        name_token = self.consume(TokenKind.identifier)
+        if name_token is None:
+            raise self.expected_identifier()
+
+        # Parse the optional annotation of the binding.
+        backtrack = self.stream_position
+        self.consume_newlines()
+        if self.consume(TokenKind.colon) is not None:
+            annotation = self.parse_annotation()
+            end = annotation.source_range.end
+        else:
+            self.rewind_to(backtrack)
+            annotation = None
+            end = name_token.source_range.end
+
+        return node.Binding(
+            name=name_token.value, annotation=annotation,
+            source_range=SourceRange(start=start_token.source_range.start, end=end))
 
     def parse_atom(self) -> node.Node:
         start_token = self.peek()
