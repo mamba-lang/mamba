@@ -25,7 +25,6 @@ class Lexer(object):
 
         self.char_index = 0
         self.location = SourceLocation()
-        self.depleted = False
 
     def take(self, n: int = 1) -> str:
         start_index = self.char_index
@@ -70,16 +69,15 @@ class Lexer(object):
             return None
 
     def lex(self):
-        while not self.depleted:
+        while True:
             # Ignore whitespaces.
             self.skip_while(is_whitespace)
 
             # Check for the end of file.
             char = self.current_char
             if char is None:
-                self.depleted = True
                 yield Token(kind=TokenKind.eof, source_range=SourceRange(start=self.location))
-                continue
+                return
 
             # Check for statement delimiters.
             if is_statement_delimiter(char):
@@ -114,22 +112,10 @@ class Lexer(object):
             if is_alnum_or_underscore(char):
                 string = self.take_while(is_alnum_or_underscore)
                 source_range = SourceRange(start=start, end=self.location)
-                if string in { 'True', 'False' }:
+                if string in { 'true', 'false' }:
                     yield Token(kind=TokenKind.boolean, source_range=source_range, value=string)
-                elif string == 'in':
-                    yield Token(kind=TokenKind.in_, source_range=source_range)
-                elif string == 'is':
-                    yield Token(kind=TokenKind.is_, source_range=source_range)
-                elif string == 'and':
-                    yield Token(kind=TokenKind.land, source_range=source_range)
-                elif string == 'or':
-                    yield Token(kind=TokenKind.lor, source_range=source_range)
-                elif string == 'not':
-                    yield Token(kind=TokenKind.lnot, source_range=source_range)
-                elif string == 'let':
-                    yield Token(kind=TokenKind.let, source_range=source_range)
-                elif string == 'def':
-                    yield Token(kind=TokenKind.def_, source_range=source_range)
+                elif string in reserved_keywords:
+                    yield Token(kind=reserved_keywords[string], source_range=source_range)
                 else:
                     yield Token(kind=TokenKind.identifier, source_range=source_range, value=string)
                 continue
@@ -162,76 +148,20 @@ class Lexer(object):
 
             # Check for operators.
             if is_operator(char):
-                # Check for operators made of 2 characters.
-                next_char = self.char(1)
-                op = char + next_char if is_operator(next_char) else char
+                # Check for reserved operators.
+                if char in reserved_operators:
+                    self.skip()
+                    source_range = SourceRange(start=start, end=self.location)
+                    yield Token(kind=reserved_operators[char], source_range=source_range)
+                    continue
+
+                # Build other operators.
+                op = char + self.take_while(is_operator)
                 source_range = SourceRange(start=start, end=self.location)
-                if op == '**':
-                    yield Token(kind=TokenKind.pow_, source_range=source_range)
-                elif op == '*':
-                    yield Token(kind=TokenKind.mul, source_range=source_range)
-                elif op == '@':
-                    yield Token(kind=TokenKind.matmul, source_range=source_range)
-                elif op == '//':
-                    yield Token(kind=TokenKind.floordiv, source_range=source_range)
-                elif op == '/':
-                    yield Token(kind=TokenKind.truediv, source_range=source_range)
-                elif op == '+':
-                    yield Token(kind=TokenKind.add, source_range=source_range)
-                elif op == '->':
-                    yield Token(kind=TokenKind.arrow, source_range=source_range)
-                elif op == '-':
-                    yield Token(kind=TokenKind.sub, source_range=source_range)
-                elif op == '<<':
-                    yield Token(kind=TokenKind.lshift, source_range=source_range)
-                elif op == '<=':
-                    yield Token(kind=TokenKind.le, source_range=source_range)
-                elif op == '<':
-                    yield Token(kind=TokenKind.lt, source_range=source_range)
-                elif op == '>>':
-                    yield Token(kind=TokenKind.rshift, source_range=source_range)
-                elif op == '>=':
-                    yield Token(kind=TokenKind.ge, source_range=source_range)
-                elif op == '>':
-                    yield Token(kind=TokenKind.gt, source_range=source_range)
-                elif op == '==':
-                    yield Token(kind=TokenKind.eq, source_range=source_range)
-                elif op == '=':
-                    yield Token(kind=TokenKind.assign, source_range=source_range)
-                elif op == '!=':
-                    yield Token(kind=TokenKind.ne, source_range=source_range)
-                elif op == '~':
-                    yield Token(kind=TokenKind.invert, source_range=source_range)
-                elif op == '&':
-                    yield Token(kind=TokenKind.and_, source_range=source_range)
-                elif op == '|':
-                    yield Token(kind=TokenKind.or_, source_range=source_range)
-                elif op == '.':
-                    yield Token(kind=TokenKind.dot, source_range=source_range)
-                elif op == ',':
-                    yield Token(kind=TokenKind.comma, source_range=source_range)
-                elif op == ':':
-                    yield Token(kind=TokenKind.colon, source_range=source_range)
-                elif op == ';':
-                    yield Token(kind=TokenKind.semicolon, source_range=source_range)
-                elif op == '(':
-                    yield Token(kind=TokenKind.lparen, source_range=source_range)
-                elif op == ')':
-                    yield Token(kind=TokenKind.rparen, source_range=source_range)
-                elif op == '{':
-                    yield Token(kind=TokenKind.lbrace, source_range=source_range)
-                elif op == '}':
-                    yield Token(kind=TokenKind.rbrace, source_range=source_range)
-                elif op == '[':
-                    yield Token(kind=TokenKind.lbracket, source_range=source_range)
-                elif op == ']':
-                    yield Token(kind=TokenKind.rbracket, source_range=source_range)
-                else:
-                    yield Token(kind=TokenKind.unknown, source_range=source_range, value=op)
-                self.skip(len(op))
+                yield Token(kind=TokenKind.operator, source_range=source_range, value=op)
                 continue
 
-            skip()
+            self.skip()
             yield Token(
                 kind=TokenKind.unknown,
                 source_range=SourceRange(start=start, end=self.location),
@@ -249,5 +179,45 @@ def is_statement_delimiter(char: str) -> bool:
 def is_alnum_or_underscore(char: str) -> bool:
     return (char == '_') or char.isalnum() or char.isdigit()
 
+
 def is_operator(char: str) -> bool:
     return char in '*@/%+-<>=!~&^|.,:;({[]})'
+
+
+reserved_keywords = {
+    'let'      : TokenKind.let,
+    'func'     : TokenKind.func,
+    'type'     : TokenKind.type,
+    'infix'    : TokenKind.infix,
+    'prefix'   : TokenKind.prefix,
+    'postfix'  : TokenKind.postfix,
+    'if'       : TokenKind.if_,
+    'then'     : TokenKind.then,
+    'else'     : TokenKind.else_,
+    'match'    : TokenKind.match,
+    'when'     : TokenKind.when,
+    'for'      : TokenKind.for_,
+    'in'       : TokenKind.in_,
+    'while'    : TokenKind.while_,
+    'continue' : TokenKind.continue_,
+    'break'    : TokenKind.break_,
+    'do'       : TokenKind.do,
+    'try'      : TokenKind.try_,
+    'catch'    : TokenKind.catch,
+}
+
+
+reserved_operators = {
+    '=': TokenKind.bind,
+    '|': TokenKind.or_,
+    '.': TokenKind.dot,
+    ',': TokenKind.comma,
+    ';': TokenKind.semicolon,
+    ':': TokenKind.colon,
+    '(': TokenKind.lparen,
+    ')': TokenKind.rparen,
+    '{': TokenKind.lbrace,
+    '}': TokenKind.rbrace,
+    '[': TokenKind.lbracket,
+    ']': TokenKind.rbracket
+}
