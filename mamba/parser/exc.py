@@ -1,4 +1,4 @@
-from mamba.lexer.lexer import SourceRange
+from mamba.lexer import SourceRange
 
 
 class ParseError(Exception):

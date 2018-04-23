@@ -1,6 +1,5 @@
 from mamba.ast import node
-from mamba.lexer.lexer import SourceLocation, SourceRange
-from mamba.lexer.token import Token, TokenKind
+from mamba.lexer import SourceLocation, SourceRange, Token, TokenKind
 
 from . import exc
 
