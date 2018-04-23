@@ -64,6 +64,17 @@ class FunctionDeclaration(Node):
         return f'func {self.name} {self.domain} -> {self.codomain} = {self.body}'
 
 
+class TypeDeclaration(Node):
+
+    def __init__(self, name: str, body: Node, source_range: SourceRange):
+        super().__init__(source_range)
+        self.name = name
+        self.body = body
+
+    def __str__(self) -> str:
+        return f'type {self.name} = {self.body}'
+
+
 class ClosureExpression(Node):
 
     def __init__(self, domain: Node, codomain: Node, body: Node, source_range: SourceRange):

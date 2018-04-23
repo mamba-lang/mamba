@@ -134,7 +134,8 @@ class Parser(object):
         token = self.peek()
         if token.kind == TokenKind.func:
             return self.parse_function_declaration()
-
+        elif token.kind == TokenKind.type:
+            return self.parse_type_declaration()
         else:
             raise exc.ExpectedDeclaration(source_range=token.source_range)
 
@@ -194,6 +195,31 @@ class Parser(object):
             source_range=SourceRange(
                 start=start_token.source_range.start, end=body.source_range.end))
 
+    def parse_type_declaration(self) -> node.TypeDeclaration:
+        # Parse the `type` keyword.
+        start_token = self.consume(TokenKind.type)
+        if start_token is None:
+            raise self.unexpected_token(expected='type')
+
+        # Parse the name of the type.
+        name_token = self.consume(TokenKind.identifier)
+        if name_token is None:
+            raise self.expected_identifier()
+
+        # Parse the binding operator.
+        self.consume_newlines()
+        if self.consume(TokenKind.bind) is None:
+            raise self.unexpected_token(expected='=')
+
+        # Parse the body of the type.
+        body = self.parse_union_type()
+
+        return node.TypeDeclaration(
+            name=name_token.value,
+            body=body,
+            source_range=SourceRange(
+                start=start_token.source_range.start, end=body.source_range.end))
+
     def parse_annotation(self) -> node.Node:
         # Attempt to parse the special `_` annotation (i.e. absence thereof).
         if self.peek().kind == TokenKind.underscore:
@@ -226,6 +252,7 @@ class Parser(object):
             backtrack = self.stream_position
             self.consume_newlines()
             if self.consume(TokenKind.or_) is None:
+                self.rewind_to(backtrack)
                 break
             self.consume_newlines()
             types.append(self.parse_type())
