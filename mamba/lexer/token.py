@@ -17,6 +17,8 @@ class TokenKind(Enum):
     comma           = ','
     colon           = ':'
     semicolon       = ';'
+    arrow           = '->'
+    bold_arrow      = '=>'
     newline         = 'newline'
     eof             = 'eof'
 
@@ -27,13 +29,13 @@ class TokenKind(Enum):
     lbracket        = '['
     rbracket        = ']'
 
+    underscore      = '_'
     let             = 'let'
     func            = 'func'
     type            = 'type'
     infix           = 'infix'
     prefix          = 'prefix'
     postfix         = 'postfix'
-
     if_             = 'if'
     then            = 'then'
     else_           = 'else'

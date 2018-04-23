@@ -153,15 +153,21 @@ class Lexer(object):
 
             # Check for operators.
             if is_operator(char):
-                # Check for reserved operators.
-                if char in reserved_operators:
+                # Check for single char operators.
+                if char in single_char_operators:
                     self.skip()
                     source_range = SourceRange(start=start, end=self.location)
-                    yield Token(kind=reserved_operators[char], source_range=source_range)
+                    yield Token(kind=single_char_operators[char], source_range=source_range)
                     continue
 
-                # Build other operators.
+                # Check for reserved operators.
                 op = self.take_while(is_operator)
+                if op in reserved_operators:
+                    source_range = SourceRange(start=start, end=self.location)
+                    yield Token(kind=reserved_operators[op], source_range=source_range)
+                    continue
+
+                # Build other "custom" operators.
                 source_range = SourceRange(start=start, end=self.location)
                 yield Token(kind=TokenKind.operator, source_range=source_range, value=op)
                 continue
@@ -213,17 +219,21 @@ reserved_keywords = {
 }
 
 
+single_char_operators = {
+    '|'        : TokenKind.or_,
+    ','        : TokenKind.comma,
+    ';'        : TokenKind.semicolon,
+    ':'        : TokenKind.colon,
+    '('        : TokenKind.lparen,
+    ')'        : TokenKind.rparen,
+    '{'        : TokenKind.lbrace,
+    '}'        : TokenKind.rbrace,
+    '['        : TokenKind.lbracket,
+    ']'        : TokenKind.rbracket,
+}
+
 reserved_operators = {
-    '=': TokenKind.bind,
-    '|': TokenKind.or_,
-    '.': TokenKind.dot,
-    ',': TokenKind.comma,
-    ';': TokenKind.semicolon,
-    ':': TokenKind.colon,
-    '(': TokenKind.lparen,
-    ')': TokenKind.rparen,
-    '{': TokenKind.lbrace,
-    '}': TokenKind.rbrace,
-    '[': TokenKind.lbracket,
-    ']': TokenKind.rbracket
+    '='        : TokenKind.bind,
+    '->'       : TokenKind.arrow,
+    '=>'       : TokenKind.bold_arrow,
 }
