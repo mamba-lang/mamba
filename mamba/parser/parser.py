@@ -303,6 +303,8 @@ class Parser(object):
             atom = self.parse_list_literal()
         elif start_token.kind == TokenKind.lbrace:
             atom = self.parse_object_literal()
+        elif start_token.kind == TokenKind.if_:
+            atom = self.parse_if_expression()
         elif (start_token.kind == TokenKind.operator) and (start_token.value in self.prefix_operators):
             atom = self.parse_prefix_expression()
         else:
@@ -429,6 +431,39 @@ class Parser(object):
             body=body,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=body.source_range.end))
+
+    def parse_if_expression(self) -> node.IfExpression:
+        # Parse the `if` keyword.
+        if_token = self.consume(TokenKind.if_)
+        if if_token is None:
+            raise self.unexpected_token(expected='if')
+
+        # Parse the condition of the expression.
+        self.consume_newlines()
+        condition = self.parse_expression()
+
+        # Parse the `then` keyword.
+        self.consume_newlines()
+        if self.consume(TokenKind.then) is None:
+            raise self.unexpected_token(expected='then')
+
+        # Parse the "then" expression.
+        self.consume_newlines()
+        then = self.parse_expression()
+
+        # Parse the `else` keyword.
+        self.consume_newlines()
+        if self.consume(TokenKind.else_) is None:
+            raise self.unexpected_token(expected='else')
+
+        # Parse the "then" expression.
+        self.consume_newlines()
+        else_ = self.parse_expression()
+
+        return node.IfExpression(
+            condition=condition, then=then, else_=else_,
+            source_range=SourceRange(
+                start=if_token.source_range.start, end=else_.source_range.end))
 
     def parse_identifier(self) -> node.Node:
         # Parse the identifier's name.

@@ -116,6 +116,18 @@ class CallExpression(Node):
         return f'{self.callee} _'
 
 
+class IfExpression(Node):
+
+    def __init__(self, condition: Node, then: Node, else_: Node, source_range: SourceRange):
+        super().__init__(source_range)
+        self.condition = condition
+        self.then = then
+        self.else_ = else_
+
+    def __str__(self) -> str:
+        return f'if {self.condition} then {self.then} else {self.else_}'
+
+
 class Identifier(Node):
 
     def __init__(self, name: str, specializers: list, source_range: SourceRange):
