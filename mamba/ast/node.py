@@ -128,6 +128,41 @@ class IfExpression(Node):
         return f'if {self.condition} then {self.then} else {self.else_}'
 
 
+class MatchExpression(Node):
+
+    def __init__(self, subject: Node, cases: list, source_range: SourceRange):
+        super().__init__(source_range)
+        self.subject = subject
+        self.cases = cases
+
+    def __str__(self) -> str:
+        cases = '\n'.join([str(c) for c in self.cases]).split('\n')
+        cases = [' ' + c for c in cases]
+        cases = '\n'.join(cases)
+        return f'match {self.subject}\n{cases}'
+
+
+class WhenCase(Node):
+
+    def __init__(self, pattern: Node, body: Node, source_range: SourceRange):
+        super().__init__(source_range)
+        self.pattern = pattern
+        self.body = body
+
+    def __str__(self) -> str:
+        return f'when {self.pattern} then {self.body}'
+
+
+class ElseCase(Node):
+
+    def __init__(self, body: Node, source_range: SourceRange):
+        super().__init__(source_range)
+        self.body = body
+
+    def __str__(self) -> str:
+        return f'else {self.body}'
+
+
 class Identifier(Node):
 
     def __init__(self, name: str, specializers: list, source_range: SourceRange):

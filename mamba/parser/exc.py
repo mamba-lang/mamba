@@ -3,8 +3,9 @@ from mamba.lexer.lexer import SourceRange
 
 class ParseError(Exception):
 
-    def __init__(self, source_range: SourceRange):
+    def __init__(self, source_range: SourceRange, message: str = ''):
         self.source_range = source_range
+        self.message = message
 
 
 class ExpectedIdentifier(ParseError):

@@ -305,6 +305,8 @@ class Parser(object):
             atom = self.parse_object_literal()
         elif start_token.kind == TokenKind.if_:
             atom = self.parse_if_expression()
+        elif start_token.kind == TokenKind.match:
+            atom = self.parse_match_expression()
         elif (start_token.kind == TokenKind.operator) and (start_token.value in self.prefix_operators):
             atom = self.parse_prefix_expression()
         else:
@@ -464,6 +466,72 @@ class Parser(object):
             condition=condition, then=then, else_=else_,
             source_range=SourceRange(
                 start=if_token.source_range.start, end=else_.source_range.end))
+
+    def parse_match_expression(self) -> node.MatchExpression:
+        start_token = self.consume(TokenKind.match)
+        if start_token is None:
+            raise self.unexpected_token(expected='match')
+
+        # Parse the subject.
+        self.consume_newlines()
+        subject = self.parse_expression()
+
+        # Parse the different cases.
+        self.consume_newlines()
+        case_token = self.peek()
+        cases = []
+        while case_token.kind in { TokenKind.when, TokenKind.else_ }:
+            cases.append(self.parse_match_case())
+            self.consume_newlines()
+            case_token = self.peek()
+
+        if not cases:
+            raise exc.ParseError(
+                message='match expressions should have at least one case',
+                source_range=self.peek().source_range)
+
+        return node.MatchExpression(
+            subject=subject, cases=cases,
+            source_range=SourceRange(
+                start=start_token.source_range.start, end=cases[-1].source_range.end))
+
+    def parse_match_case(self) -> node.Node:
+        start_token = self.peek()
+
+        # Parse a when case.
+        if start_token.kind == TokenKind.when:
+            # Parse the case pattern.
+            self.consume()
+            self.consume_newlines()
+            pattern = self.parse_expression()
+
+            # Parse the `then` keyword.
+            self.consume_newlines()
+            if self.consume(TokenKind.then) is None:
+                raise self.unexpected_token(expected='then')
+
+            # Parse the case body.
+            self.consume_newlines()
+            body = self.parse_expression()
+
+            return node.WhenCase(
+                pattern=pattern, body=body,
+                source_range=SourceRange(
+                    start=start_token.source_range.start, end= body.source_range.end))
+
+        # Parse an else case.
+        if start_token.kind == TokenKind.else_:
+            # Parse the case body.
+            self.consume()
+            self.consume_newlines()
+            body = self.parse_expression()
+
+            return node.ElseCase(
+                body=body,
+                source_range=SourceRange(
+                    start=start_token.source_range.start, end=body.source_range.end))
+
+        raise self.unexpected_token(expected='when')
 
     def parse_identifier(self) -> node.Node:
         # Parse the identifier's name.
