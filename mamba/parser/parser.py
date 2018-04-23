@@ -113,6 +113,23 @@ class Parser(object):
 
         return elements
 
+    def parse_parenthesized(self, parser: callable) -> node.ParenthesizedNode:
+        start_token = self.consume(TokenKind.lparen)
+        if start_token is None:
+            raise self.unexpected_token(expected='(')
+
+        self.consume_newlines()
+        enclosed = parser()
+        self.consume_newlines()
+        end_token = self.consume(TokenKind.rparen)
+        if end_token is None:
+            raise exc.ImbalancedParenthesis(source_range=self.peek().source_range)
+
+        return node.ParenthesizedNode(
+            node=enclosed,
+            source_range=SourceRange(
+                start=start_token.source_range.start, end=end_token.source_range.end))
+
     def parse_declaration(self) -> node.Node:
         token = self.peek()
         if token.kind == TokenKind.func:
@@ -178,23 +195,48 @@ class Parser(object):
                 start=start_token.source_range.start, end=body.source_range.end))
 
     def parse_annotation(self) -> node.Node:
-        if self.peek().kind == TokenKind.lparen:
-            start = self.consume().source_range.start
-            self.consume_newlines()
-            enclosed = self.parse_annotation()
-            self.consume_newlines()
-            end_token = self.consume(TokenKind.rparen)
-            if end_token is None:
-                raise exc.ImbalancedParenthesis(source_range=self.peek().source_range)
-            return node.ParenthesizedNode(
-                node=enclosed,
-                source_range=SourceRange(start=start, end=end_token.source_range.end))
-
         # Attempt to parse the special `_` annotation (i.e. absence thereof).
         if self.peek().kind == TokenKind.underscore:
             return node.Nothing(source_range=self.consume().source_range)
 
+        return self.parse_union_type()
+
+    def parse_type(self) -> node.Node:
+        # Parse a parenthesized type.
+        if self.peek().kind == TokenKind.lparen:
+            return self.parse_parenthesized(self.parse_type)
+
         return self.attempt(self.parse_identifier) or self.parse_object_type()
+
+    def parse_union_type(self) -> node.Node:
+        # If the current token is a left parenthesis, we can't already know whether it encloses a
+        # single type of a union, or if it encloses the union type itself. In other words, are we
+        # parsing `(T1 | T2)` or `(T1) | T2`?
+        if self.peek().kind == TokenKind.lparen:
+            # If parsing a parenthesized union type succeeds, then we use the result as the "first"
+            # type of the union, in case the next consumable token is `|`. Otherwise, we retry
+            # parsing the parenthesis as part of an individual.
+            union = self.attempt(lambda: self.parse_parenthesized(self.parse_union_type))
+            types = [union] if union is not None else [self.parse_type()]
+        else:
+            types = [self.parse_type()]
+
+        # Attempt to parse other types, separated by `|`.
+        while True:
+            backtrack = self.stream_position
+            self.consume_newlines()
+            if self.consume(TokenKind.or_) is None:
+                break
+            self.consume_newlines()
+            types.append(self.parse_type())
+
+        if len(types) > 1:
+            return node.UnionType(
+                types=types,
+                source_range=SourceRange(
+                    start=types[0].source_range.start, end=types[-1].source_range.start))
+        else:
+            return types[0]
 
     def parse_object_type(self) -> node.Node:
         # Parse a left brace.
@@ -314,16 +356,7 @@ class Parser(object):
         start_token = self.peek()
 
         if start_token.kind == TokenKind.lparen:
-            start = self.consume().source_range.start
-            self.consume_newlines()
-            enclosed = self.parse_expression()
-            self.consume_newlines()
-            end_token = self.consume(TokenKind.rparen)
-            if end_token is None:
-                raise exc.ImbalancedParenthesis(source_range=self.peek().source_range)
-            return node.ParenthesizedNode(
-                node=enclosed,
-                source_range=SourceRange(start=start, end=end_token.source_range.end))
+            atom = self.parse_parenthesized(self.parse_expression)
 
         elif start_token.kind in scalar_literal_kinds:
             token = self.consume()

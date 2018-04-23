@@ -28,6 +28,16 @@ class ObjectType(Node):
         return '{ ' + ', '.join([str(m) for m in self.members]) + ' }'
 
 
+class UnionType(Node):
+
+    def __init__(self, types: list, source_range: SourceRange):
+        super().__init__(source_range)
+        self.types = types
+
+    def __str__(self) -> str:
+        return ' | '.join([str(t) for t in self.types])
+
+
 class ObjectProperty(Node):
 
     def __init__(self, name: str, annotation: Node, source_range: SourceRange):
