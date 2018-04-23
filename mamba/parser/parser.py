@@ -1,4 +1,4 @@
-from mamba.ast import node
+from mamba import ast
 from mamba.lexer import SourceLocation, SourceRange, Token, TokenKind
 
 from . import exc
@@ -65,7 +65,7 @@ class Parser(object):
     def expected_identifier(self):
         return exc.ExpectedIdentifier(source_range=self.peek().source_range)
 
-    def attempt(self, parser: callable) -> node.Node:
+    def attempt(self, parser: callable) -> ast.Node:
         backtrack = self.stream_position
         try:
             return parser()
@@ -73,7 +73,7 @@ class Parser(object):
             self.rewind_to(backtrack)
         return None
 
-    def parse(self) -> node.Node:
+    def parse(self) -> ast.Node:
         declarations = []
 
         while True:
@@ -92,9 +92,9 @@ class Parser(object):
                 start=declarations[0].source_range.start, end=declarations[-1].source_range.end)
         else:
             source_range = SourceRange(start=SourceLocation())
-        return node.Module(declarations=declarations, source_range=source_range)
+        return ast.Module(declarations=declarations, source_range=source_range)
 
-    def parse_sequence(self, delimiter: TokenKind, parse_item: callable) -> node.Node:
+    def parse_sequence(self, delimiter: TokenKind, parse_item: callable) -> ast.Node:
         # Skip leading new lines.
         self.consume_newlines()
 
@@ -112,7 +112,7 @@ class Parser(object):
 
         return elements
 
-    def parse_parenthesized(self, parser: callable) -> node.ParenthesizedNode:
+    def parse_parenthesized(self, parser: callable) -> ast.ParenthesizedNode:
         start_token = self.consume(TokenKind.lparen)
         if start_token is None:
             raise self.unexpected_token(expected='(')
@@ -124,12 +124,12 @@ class Parser(object):
         if end_token is None:
             raise exc.ImbalancedParenthesis(source_range=self.peek().source_range)
 
-        return node.ParenthesizedNode(
+        return ast.ParenthesizedNode(
             node=enclosed,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=end_token.source_range.end))
 
-    def parse_declaration(self) -> node.Node:
+    def parse_declaration(self) -> ast.Node:
         token = self.peek()
         if token.kind == TokenKind.func:
             return self.parse_function_declaration()
@@ -138,7 +138,7 @@ class Parser(object):
         else:
             raise exc.ExpectedDeclaration(source_range=token.source_range)
 
-    def parse_function_declaration(self) -> node.FunctionDeclaration:
+    def parse_function_declaration(self) -> ast.FunctionDeclaration:
         # Parse the `func` keyword.
         start_token = self.consume(TokenKind.func)
         if start_token is None:
@@ -152,12 +152,12 @@ class Parser(object):
         # Parse the domain of the function.
         self.consume_newlines()
         if self.peek().kind == TokenKind.underscore:
-            domain = node.Nothing(source_range=self.consume().source_range)
+            domain = ast.Nothing(source_range=self.consume().source_range)
         else:
             # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
             prop = self.attempt(self.parse_object_property)
             if prop is not None:
-                domain = node.ObjectType(members=[prop], source_range=prop.source_range)
+                domain = ast.ObjectType(members=[prop], source_range=prop.source_range)
             else:
                 domain = self.parse_annotation()
 
@@ -169,12 +169,12 @@ class Parser(object):
         # Parse the codomain of the function.
         self.consume_newlines()
         if self.peek().kind == TokenKind.underscore:
-            codomain = node.Nothing(source_range=self.consume().source_range)
+            codomain = ast.Nothing(source_range=self.consume().source_range)
         else:
             # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
             prop = self.attempt(self.parse_object_property)
             if prop is not None:
-                codomain = node.ObjectType(members=[prop], source_range=prop.source_range)
+                codomain = ast.ObjectType(members=[prop], source_range=prop.source_range)
             else:
                 codomain = self.parse_annotation()
 
@@ -186,7 +186,7 @@ class Parser(object):
         # Parse the body of the function.
         body = self.parse_expression()
 
-        return node.FunctionDeclaration(
+        return ast.FunctionDeclaration(
             name=name_token.value,
             domain=domain,
             codomain=codomain,
@@ -194,7 +194,7 @@ class Parser(object):
             source_range=SourceRange(
                 start=start_token.source_range.start, end=body.source_range.end))
 
-    def parse_type_declaration(self) -> node.TypeDeclaration:
+    def parse_type_declaration(self) -> ast.TypeDeclaration:
         # Parse the `type` keyword.
         start_token = self.consume(TokenKind.type)
         if start_token is None:
@@ -213,27 +213,27 @@ class Parser(object):
         # Parse the body of the type.
         body = self.parse_union_type()
 
-        return node.TypeDeclaration(
+        return ast.TypeDeclaration(
             name=name_token.value,
             body=body,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=body.source_range.end))
 
-    def parse_annotation(self) -> node.Node:
+    def parse_annotation(self) -> ast.Node:
         # Attempt to parse the special `_` annotation (i.e. absence thereof).
         if self.peek().kind == TokenKind.underscore:
-            return node.Nothing(source_range=self.consume().source_range)
+            return ast.Nothing(source_range=self.consume().source_range)
 
         return self.parse_union_type()
 
-    def parse_type(self) -> node.Node:
+    def parse_type(self) -> ast.Node:
         # Parse a parenthesized type.
         if self.peek().kind == TokenKind.lparen:
             return self.parse_parenthesized(self.parse_type)
 
         return self.attempt(self.parse_identifier) or self.parse_object_type()
 
-    def parse_union_type(self) -> node.Node:
+    def parse_union_type(self) -> ast.Node:
         # If the current token is a left parenthesis, we can't already know whether it encloses a
         # single type of a union, or if it encloses the union type itself. In other words, are we
         # parsing `(T1 | T2)` or `(T1) | T2`?
@@ -257,14 +257,14 @@ class Parser(object):
             types.append(self.parse_type())
 
         if len(types) > 1:
-            return node.UnionType(
+            return ast.UnionType(
                 types=types,
                 source_range=SourceRange(
                     start=types[0].source_range.start, end=types[-1].source_range.start))
         else:
             return types[0]
 
-    def parse_object_type(self) -> node.Node:
+    def parse_object_type(self) -> ast.Node:
         # Parse a left brace.
         start_token = self.consume(TokenKind.lbrace)
         if start_token is None:
@@ -276,12 +276,12 @@ class Parser(object):
         if end_token is None:
             raise self.unexpected_token(expected='}')
 
-        return node.ObjectType(
+        return ast.ObjectType(
             members=members,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=end_token.source_range.end))
 
-    def parse_object_property(self) -> node.Node:
+    def parse_object_property(self) -> ast.Node:
         # Parse the name of the property.
         name_token = self.consume()
         if (name_token is None) or (name_token.kind != TokenKind.identifier):
@@ -299,11 +299,11 @@ class Parser(object):
             annotation = None
             end = name_token.source_range.end
 
-        return node.ObjectProperty(
+        return ast.ObjectProperty(
             name=name, annotation=annotation,
             source_range=SourceRange(start=name_token.source_range.start, end=end))
 
-    def parse_expression(self) -> node.Node:
+    def parse_expression(self) -> ast.Node:
         # Attempt to parse a binding.
         if self.peek().kind == TokenKind.let:
             return self.parse_binding()
@@ -325,7 +325,7 @@ class Parser(object):
 
             # If the left operand is an infix expression, we should check the precedence and
             # associativity of its operator against the current one.
-            if isinstance(left, node.InfixExpression):
+            if isinstance(left, ast.InfixExpression):
                 lprec = self.infix_operators[left.operator.value]['precedence']
                 rprec = self.infix_operators[operator.value]['precedence']
                 associativity = self.infix_operators[left.operator.value]['associativity']
@@ -333,18 +333,18 @@ class Parser(object):
                 if ((lprec < rprec) or
                     ((left.operator.value == operator.value) and (associativity == 'right'))):
 
-                    new_right = node.InfixExpression(
+                    new_right = ast.InfixExpression(
                         operator=operator, left=left.right, right=right,
                         source_range=SourceRange(
                             start=left.right.source_range.start, end=right.source_range.end))
-                    left = node.InfixExpression(
+                    left = ast.InfixExpression(
                         operator=left.operator, left=left.left, right=new_right,
                         source_range=SourceRange(
                             start=left.left.source_range.start, end=right.source_range.end))
                     continue
 
 
-            left = node.InfixExpression(
+            left = ast.InfixExpression(
                 operator=operator, left=left, right=right,
                 source_range=SourceRange(
                     start=left.source_range.start, end=right.source_range.end))
@@ -352,7 +352,7 @@ class Parser(object):
 
         return left
 
-    def parse_binding(self) -> node.Binding:
+    def parse_binding(self) -> ast.Binding:
         start_token = self.consume(TokenKind.let)
         if start_token is None:
             raise self.unexpected_token(expected='let')
@@ -374,11 +374,11 @@ class Parser(object):
             annotation = None
             end = name_token.source_range.end
 
-        return node.Binding(
+        return ast.Binding(
             name=name_token.value, annotation=annotation,
             source_range=SourceRange(start=start_token.source_range.start, end=end))
 
-    def parse_atom(self) -> node.Node:
+    def parse_atom(self) -> ast.Node:
         start_token = self.peek()
 
         if start_token.kind == TokenKind.lparen:
@@ -386,7 +386,7 @@ class Parser(object):
 
         elif start_token.kind in scalar_literal_kinds:
             token = self.consume()
-            atom = node.ScalarLiteral(value=token.value, source_range=token.source_range)
+            atom = ast.ScalarLiteral(value=token.value, source_range=token.source_range)
         elif start_token.kind == TokenKind.identifier:
             atom = self.parse_identifier()
         elif start_token.kind == TokenKind.lbracket:
@@ -419,15 +419,15 @@ class Parser(object):
                     # operator, but one may also see this as the application of `a` to the prefix
                     # expression `+b` (i.e. `a { _0 = +b }`).
                     # We choose to desambiguise this situation by prioritizing infix expressions.
-                    if isinstance(value, node.PrefixExpression):
-                        if node.operator in self.infix_operators:
+                    if isinstance(value, ast.PrefixExpression):
+                        if ast.operator in self.infix_operators:
                             self.rewind_to(backtrack)
                             break
 
-                    argument = node.ObjectLiteral(
+                    argument = ast.ObjectLiteral(
                         items={ '_0': value }, source_range=value.source_range)
 
-                atom = node.CallExpression(
+                atom = ast.CallExpression(
                     callee=atom,
                     argument=argument,
                     source_range=SourceRange(
@@ -443,7 +443,7 @@ class Parser(object):
             # An underscore corresponds to a call to a function without any argument.
             if suffix_token == TokenKind.underscore:
                 end_token = self.consume()
-                atom = node.CallExpression(
+                atom = ast.CallExpression(
                     callee=atom,
                     argument=None,
                     source_range=SourceRange(
@@ -453,7 +453,7 @@ class Parser(object):
             # If we can parse a postfix operator, we interpret it as a postfix expression.
             if suffix_token.kind == TokenKind.operator and (suffix_token.value in self.postfix_operators):
                 operator = self.consume()
-                atom = node.PostfixExpression(
+                atom = ast.PostfixExpression(
                     operator=operator,
                     operand=atom,
                     source_range=SourceRange(
@@ -465,7 +465,7 @@ class Parser(object):
 
         return atom
 
-    def parse_prefix_expression(self) -> node.PrefixExpression:
+    def parse_prefix_expression(self) -> ast.PrefixExpression:
         # Parse the operator of the expression.
         start_token = self.consume()
         if (start_token is None) or (start_token.value not in self.prefix_operators):
@@ -473,23 +473,23 @@ class Parser(object):
 
         # Parse the operand of the expression.
         operand = self.parse_expression()
-        return node.PrefixExpression(
+        return ast.PrefixExpression(
             operator=start_token, operand=operand,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=operand.source_range.end))
 
-    def parse_closure_expression(self) -> node.ClosureExpression:
+    def parse_closure_expression(self) -> ast.ClosureExpression:
         start_token = self.peek()
 
         # Parse the domain definition.
         if start_token.kind == TokenKind.underscore:
             self.consume()
-            domain = node.Nothing(source_range=self.consume().source_range)
+            domain = ast.Nothing(source_range=self.consume().source_range)
         else:
             # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
             prop = self.attempt(self.parse_object_property)
             if prop is not None:
-                domain = node.ObjectType(members=[prop], source_range=prop.source_range)
+                domain = ast.ObjectType(members=[prop], source_range=prop.source_range)
             else:
                 domain = self.parse_annotation()
 
@@ -498,12 +498,12 @@ class Parser(object):
         if self.consume(TokenKind.arrow) is not None:
             self.consume_newlines()
             if self.peek().kind == TokenKind.underscore:
-                codomain = node.Nothing(source_range=self.consume().source_range)
+                codomain = ast.Nothing(source_range=self.consume().source_range)
             else:
                 # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
                 prop = self.attempt(self.parse_object_property)
                 if prop is not None:
-                    codomain = node.ObjectType(members=[prop], source_range=prop.source_range)
+                    codomain = ast.ObjectType(members=[prop], source_range=prop.source_range)
                 else:
                     codomain = self.parse_annotation()
         else:
@@ -517,14 +517,14 @@ class Parser(object):
         # Parse the body of the function.
         body = self.parse_expression()
 
-        return node.ClosureExpression(
+        return ast.ClosureExpression(
             domain=domain,
             codomain=codomain,
             body=body,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=body.source_range.end))
 
-    def parse_if_expression(self) -> node.IfExpression:
+    def parse_if_expression(self) -> ast.IfExpression:
         # Parse the `if` keyword.
         if_token = self.consume(TokenKind.if_)
         if if_token is None:
@@ -552,12 +552,12 @@ class Parser(object):
         self.consume_newlines()
         else_ = self.parse_expression()
 
-        return node.IfExpression(
+        return ast.IfExpression(
             condition=condition, then=then, else_=else_,
             source_range=SourceRange(
                 start=if_token.source_range.start, end=else_.source_range.end))
 
-    def parse_match_expression(self) -> node.MatchExpression:
+    def parse_match_expression(self) -> ast.MatchExpression:
         start_token = self.consume(TokenKind.match)
         if start_token is None:
             raise self.unexpected_token(expected='match')
@@ -580,12 +580,12 @@ class Parser(object):
                 message='match expressions should have at least one case',
                 source_range=self.peek().source_range)
 
-        return node.MatchExpression(
+        return ast.MatchExpression(
             subject=subject, cases=cases,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=cases[-1].source_range.end))
 
-    def parse_match_case(self) -> node.Node:
+    def parse_match_case(self) -> ast.Node:
         start_token = self.peek()
 
         # Parse a when case.
@@ -604,7 +604,7 @@ class Parser(object):
             self.consume_newlines()
             body = self.parse_expression()
 
-            return node.WhenCase(
+            return ast.WhenCase(
                 pattern=pattern, body=body,
                 source_range=SourceRange(
                     start=start_token.source_range.start, end= body.source_range.end))
@@ -616,14 +616,14 @@ class Parser(object):
             self.consume_newlines()
             body = self.parse_expression()
 
-            return node.ElseCase(
+            return ast.ElseCase(
                 body=body,
                 source_range=SourceRange(
                     start=start_token.source_range.start, end=body.source_range.end))
 
         raise self.unexpected_token(expected='when')
 
-    def parse_identifier(self) -> node.Node:
+    def parse_identifier(self) -> ast.Node:
         # Parse the identifier's name.
         identifier_token = self.consume(TokenKind.identifier)
         if identifier_token is None:
@@ -649,19 +649,19 @@ class Parser(object):
             specializers = None
             end = identifier_token.source_range.end
 
-        return node.Identifier(
+        return ast.Identifier(
             name=identifier_token.value,
             specializers=specializers,
             source_range=SourceRange(start=identifier_token.source_range.start, end=end))
 
-    def parse_scalar_literal(self) -> node.ScalarLiteral:
+    def parse_scalar_literal(self) -> ast.ScalarLiteral:
         if self.peek().kind in { TokenKind.boolean, TokenKind.number, TokenKind.string }:
             token = self.consume()
-            return node.ScalarLiteral(value=token.value, source_range=token.source_range)
+            return ast.ScalarLiteral(value=token.value, source_range=token.source_range)
         else:
             raise self.unexpected_token(expected='literal value')
 
-    def parse_list_literal(self) -> node.ListLiteral:
+    def parse_list_literal(self) -> ast.ListLiteral:
         # Parse a left bracket.
         start_token = self.consume(TokenKind.lbracket)
         if start_token is None:
@@ -673,12 +673,12 @@ class Parser(object):
         if end_token is None:
             raise self.unexpected_token(expected=']')
 
-        return node.ListLiteral(
+        return ast.ListLiteral(
             items=items,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=end_token.source_range.end))
 
-    def parse_object_literal(self) -> node.ObjectLiteral:
+    def parse_object_literal(self) -> ast.ObjectLiteral:
         # Parse a left brace.
         start_token = self.consume(TokenKind.lbrace)
         if start_token is None:
@@ -690,7 +690,7 @@ class Parser(object):
         if end_token is None:
             raise self.unexpected_token(expected='}')
 
-        return node.ObjectLiteral(
+        return ast.ObjectLiteral(
             items={ key: value for key, value in items },
             source_range=SourceRange(
                 start=start_token.source_range.start, end=end_token.source_range.end))
