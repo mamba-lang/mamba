@@ -161,7 +161,7 @@ class Lexer(object):
                     continue
 
                 # Build other operators.
-                op = char + self.take_while(is_operator)
+                op = self.take_while(is_operator)
                 source_range = SourceRange(start=start, end=self.location)
                 yield Token(kind=TokenKind.operator, source_range=source_range, value=op)
                 continue
