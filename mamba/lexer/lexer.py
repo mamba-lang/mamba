@@ -190,6 +190,7 @@ def is_operator(char: str) -> bool:
 
 
 reserved_keywords = {
+    '_'        : TokenKind.underscore,
     'let'      : TokenKind.let,
     'func'     : TokenKind.func,
     'type'     : TokenKind.type,
