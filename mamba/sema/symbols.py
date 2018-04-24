@@ -19,6 +19,7 @@ class SymbolBinder(ast.Visitor):
         # Push a new scope, so that symbols of the module can shadow built-in ones.
         self.scopes.append(Scope(parent=self.scopes[-1]))
         self.generic_visit(node)
+        self.scopes.pop()
 
     def visit_FunctionDeclaration(self, node):
         # Add the name of the function to the current scope.
@@ -32,8 +33,13 @@ class SymbolBinder(ast.Visitor):
             return
         node.symbol = symbol
 
-        # Push a new scope for the function itself, and add its arguments.
+        # Push a new scope for the function itself.
         self.scopes.append(Scope(parent=self.scopes[-1]))
+
+        # Insert the function arguments and generic placeholders into its scope.
+        for placeholder in node.placeholders:
+            self.scopes[-1].insert(Symbol(name=placeholder))
+
         if isinstance(node.domain, ast.ObjectType):
             for member in node.domain.members:
                 if self.scopes[-1].contains(lambda s: s.name == member.name):
@@ -44,7 +50,9 @@ class SymbolBinder(ast.Visitor):
                 self.scopes[-1].insert(parameter_symbol)
                 member.symbol = parameter_symbol
 
+        # Visit the innards of the function declaration.
         self.generic_visit(node)
+        self.scopes.pop()
 
     def visit_TypeDeclaration(self, node):
         # Add the name of the type to the current scope.
@@ -58,7 +66,14 @@ class SymbolBinder(ast.Visitor):
             return
         node.symbol = symbol
 
+        # Push a new scope for the type itself, and insert its generic placeholders into.
+        self.scopes.append(Scope(parent=self.scopes[-1]))
+        for placeholder in node.placeholders:
+            self.scopes[-1].insert(Symbol(name=placeholder))
+
+        # Visit the innards of the type declaration.
         self.generic_visit(node)
+        self.scopes.pop()
 
     def visit_Identifier(self, node):
         # Look for the symbol to which bind the identifier.
