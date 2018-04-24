@@ -152,6 +152,15 @@ class Parser(object):
         if name_token is None:
             raise self.expected_identifier()
 
+        # Parse the optional placeholders.
+        self.consume_newlines()
+        if self.consume(TokenKind.lbracket) is not None:
+            placeholders = self.parse_sequence(TokenKind.rbracket, self.parse_placeholder)
+            if self.consume(TokenKind.rbracket) is None:
+                raise self.unexpected_token(expected=']')
+        else:
+            placeholders = []
+
         # Parse the domain of the function.
         self.consume_newlines()
         if self.peek().kind == TokenKind.underscore:
@@ -191,6 +200,7 @@ class Parser(object):
 
         return ast.FunctionDeclaration(
             name=name_token.value,
+            placeholders=placeholders,
             domain=domain,
             codomain=codomain,
             body=body,
@@ -221,6 +231,12 @@ class Parser(object):
             body=body,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=body.source_range.end))
+
+    def parse_placeholder(self):
+        name = self.consume(TokenKind.identifier)
+        if name is None:
+            raise self.expected_identifier()
+        return name.value
 
     def parse_annotation(self) -> ast.Node:
         # Attempt to parse the special `_` annotation (i.e. absence thereof).

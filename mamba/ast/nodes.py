@@ -63,17 +63,26 @@ class ObjectProperty(Node):
 
 class FunctionDeclaration(Node):
 
-    _fields = ('name', 'domain', 'codomain', 'body',)
+    _fields = ('name', 'placeholders', 'domain', 'codomain', 'body',)
 
-    def __init__(self, name: str, domain: Node, codomain: Node, body: Node, source_range: SourceRange):
+    def __init__(
+        self,
+        name: str, placeholders: list, domain: Node, codomain: Node, body: Node,
+        source_range: SourceRange):
+
         super().__init__(source_range)
         self.name = name
+        self.placeholders = placeholders
         self.domain = domain
         self.codomain = codomain
         self.body = body
 
     def __str__(self) -> str:
-        return f'func {self.name} {self.domain} -> {self.codomain} = {self.body}'
+        if self.placeholders:
+            placeholders = '[ ' + ', '.join(self.placeholders) + ' ]'
+        else:
+            placeholders = ''
+        return f'func {self.name}{placeholders} {self.domain} -> {self.codomain} = {self.body}'
 
 
 class TypeDeclaration(Node):
