@@ -14,6 +14,13 @@ class ParseError(Exception):
             return f'{self.source_range.start}: {self.__class__.__name__}'
 
 
+class DuplicateKey(ParseError):
+
+    def __init__(self, key: Token):
+        super().__init__(operator.source_range, operator.value)
+        self.key = key
+
+
 class ImbalancedParenthesis(ParseError):
 
     def __init__(self, source_range: SourceRange):

@@ -235,14 +235,14 @@ class Identifier(Node):
 
     _fields = ('name',)
 
-    def __init__(self, name: str, specializers: list, source_range: SourceRange):
+    def __init__(self, name: str, specializers: dict, source_range: SourceRange):
         super().__init__(source_range)
         self.name = name
         self.specializers = specializers
 
     def __str__(self) -> str:
         if self.specializers:
-            specs = ', '.join(self.specializers)
+            specs = ', '.join(f'{key} = {value}' for key, value in self.specializers.items())
             return f'{self.name}[ {specs} ]'
         else:
             return self.name

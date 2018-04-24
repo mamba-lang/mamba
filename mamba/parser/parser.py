@@ -644,19 +644,31 @@ class Parser(object):
             raise self.expected_identifier()
 
         # Parse the optional specializers.
-        def parse_name():
-            name = self.consume(TokenKind.identifier)
-            if name is None:
-                raise self.expected_identifier()
-            return name.value
-
         backtrack = self.stream_position
         self.consume_newlines()
         if self.consume(TokenKind.lbracket):
-            specializers = self.parse_sequence(TokenKind.rbracket, parse_name)
-            end_token = self.consume(TokenKind.rbracket)
-            if end_token is None:
-                raise self.unexpected_token(expected=']')
+            # We first try to parse a single annotation, with no label, so as to handle the
+            # syntactic sugar consisting of omitting labels for for generic types with only a
+            # single placeholder.
+            self.consume_newlines()
+            sugar_backtrack = self.stream_position
+            try:
+                specializers = {'_0': self.parse_annotation()}
+                self.consume_newlines()
+                end_token = self.consume(TokenKind.rbracket)
+                if end_token is None:
+                    raise self.unexpected_token(expected=']')
+            except:
+                self.rewind_to(sugar_backtrack)
+                pairs = self.parse_sequence(TokenKind.rbracket, self.parse_specializer)
+                specializers = {}
+                for (name_token, value) in pairs:
+                    if name_token.value in specializers:
+                        raise exc.DuplicateKey(key=name_token)
+                    specializers[name_token.value] = value
+                end_token = self.consume(TokenKind.rbracket)
+                if end_token is None:
+                    raise self.unexpected_token(expected=']')
             end = end_token.source_range.end
         else:
             self.rewind_to(backtrack)
@@ -667,6 +679,22 @@ class Parser(object):
             name=identifier_token.value,
             specializers=specializers,
             source_range=SourceRange(start=identifier_token.source_range.start, end=end))
+
+    def parse_specializer(self) -> tuple:
+        # Parse the name of the specializer.
+        name_token = self.consume(TokenKind.identifier)
+        if name_token is None:
+            raise self.expected_identifier()
+
+        # Parse the binding operator.
+        self.consume_newlines()
+        if self.consume(TokenKind.bind) is None:
+            raise self.unexpected_token(expected='=')
+
+        # Parse the value of the specializer.
+        self.consume_newlines()
+        value = self.parse_annotation()
+        return (name_token, value)
 
     def parse_scalar_literal(self) -> ast.ScalarLiteral:
         if self.peek().kind in { TokenKind.boolean, TokenKind.number, TokenKind.string }:
