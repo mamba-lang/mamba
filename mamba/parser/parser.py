@@ -27,9 +27,11 @@ class Parser(object):
             '%' : { 'precedence': 70, 'associativity': 'left' },
             '**': { 'precedence': 80, 'associativity': 'right' },
             '.' : { 'precedence': 90, 'associativity': 'left' },
+            '?' : { 'precedence': 90, 'associativity': 'left' },
+            '!' : { 'precedence': 90, 'associativity': 'left' },
         }
         self.prefix_operators = { '+', '-' }
-        self.postfix_operators = { '!' }
+        self.postfix_operators = { '!', '?', '+' }
 
     def peek(self) -> Token:
         return self.stream[self.stream_position]
@@ -413,14 +415,15 @@ class Parser(object):
                 if argument is None:
                     value = self.parse_expression()
 
-                    # Operators that can act as both a prefix and a infix operator introduce some
-                    # ambuiguity, as to how an expression like `a + b` should be parsed. The most
-                    # intuitive way to interpret this expression is arguably to see `+` as an infix
-                    # operator, but one may also see this as the application of `a` to the prefix
-                    # expression `+b` (i.e. `a { _0 = +b }`).
+                    # Operators that can act as both an infix and a prefix or postfix operator
+                    # introduce some ambuiguity, as to how an expression like `a + b` should be
+                    # parsed. The most intuitive way to interpret this expression is arguably to
+                    # see `+` as an infix operator, but one may also see this as the application of
+                    # `a` to the expression `+b` (i.e. `a { _0 = +b }`), or the application of `a+`
+                    # the expression `b` (i.e. `a+ { _0 = b }`).
                     # We choose to desambiguise this situation by prioritizing infix expressions.
                     if isinstance(value, ast.PrefixExpression):
-                        if ast.operator in self.infix_operators:
+                        if value.operator.value in self.infix_operators:
                             self.rewind_to(backtrack)
                             break
 
@@ -453,6 +456,14 @@ class Parser(object):
             # If we can parse a postfix operator, we interpret it as a postfix expression.
             if suffix_token.kind == TokenKind.operator and (suffix_token.value in self.postfix_operators):
                 operator = self.consume()
+
+                # Backtrack if the operator is also infix and the remainder of the stream can be
+                # parsed as an expression.
+                if operator.value in self.infix_operators:
+                    if self.attempt(self.parse_expression) is not None:
+                        self.rewind_to(backtrack)
+                        break
+
                 atom = ast.PostfixExpression(
                     operator=operator,
                     operand=atom,
