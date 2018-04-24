@@ -1,3 +1,5 @@
+from copy import copy
+
 from mamba.lexer.token import Token, TokenKind
 
 
@@ -8,12 +10,18 @@ class SourceLocation(object):
         self.column = column
         self.offset = offset
 
+    def __str__(self) -> str:
+        return f'{self.line}:{self.column}'
+
 
 class SourceRange(object):
 
     def __init__(self, start: SourceLocation, end: SourceLocation=None):
         self.start = start
         self.end = end or start
+
+    def __str__(self) -> str:
+        return f'{self.start}...{self.end}'
 
 
 class Lexer(object):
@@ -73,16 +81,18 @@ class Lexer(object):
             # Ignore whitespaces.
             self.skip_while(is_whitespace)
 
+            start = copy(self.location)
+
             # Check for the end of file.
             char = self.current_char
             if char is None:
-                yield Token(kind=TokenKind.eof, source_range=SourceRange(start=self.location))
+                yield Token(kind=TokenKind.eof, source_range=SourceRange(start=start))
                 return
 
             # Check for statement delimiters.
             if is_statement_delimiter(char):
                 kind = TokenKind.newline if char == '\n' else TokenKind.semicolon
-                token = Token(kind=kind, source_range=SourceRange(start=self.location))
+                token = Token(kind=kind, source_range=SourceRange(start=start))
                 self.skip_while(lambda c: c.isspace() or is_statement_delimiter(c))
                 yield token
                 continue
@@ -91,8 +101,6 @@ class Lexer(object):
             if char == '#':
                 self.skip_while(lambda c: c != '\n')
                 continue
-
-            start = self.location
 
             # Check for number literals.
             if char.isdigit():
@@ -108,14 +116,14 @@ class Lexer(object):
                     value = int(number)
                 yield Token(
                     kind=kind,
-                    source_range=SourceRange(start=start, end=self.location),
+                    source_range=SourceRange(start=start, end=copy(self.location)),
                     value=value)
                 continue
 
             # Check for identifiers.
             if is_alnum_or_underscore(char):
                 string = self.take_while(is_alnum_or_underscore)
-                source_range = SourceRange(start=start, end=self.location)
+                source_range = SourceRange(start=start, end=copy(self.location))
                 if string in { 'true', 'false' }:
                     value = string == 'true'
                     yield Token(kind=TokenKind.boolean, source_range=source_range, value=value)
@@ -135,7 +143,7 @@ class Lexer(object):
                         self.skip_while(lambda _: True)
                         yield Token(
                             kind=TokenKind.unterminated_string_literal,
-                            source_range=SourceRange(start=start, end=self.location))
+                            source_range=SourceRange(start=start, end=copy(self.location)))
                         return
                     self.skip()
 
@@ -147,7 +155,7 @@ class Lexer(object):
                 self.skip()
                 yield Token(
                     kind=TokenKind.string,
-                    source_range=SourceRange(start=start, end=self.location),
+                    source_range=SourceRange(start=start, end=copy(self.location)),
                     value=value)
                 continue
 
@@ -156,26 +164,26 @@ class Lexer(object):
                 # Check for single char operators.
                 if char in single_char_operators:
                     self.skip()
-                    source_range = SourceRange(start=start, end=self.location)
+                    source_range = SourceRange(start=start, end=copy(self.location))
                     yield Token(kind=single_char_operators[char], source_range=source_range)
                     continue
 
                 # Check for reserved operators.
                 op = self.take_while(lambda o: is_operator(o) and not o in single_char_operators)
                 if op in reserved_operators:
-                    source_range = SourceRange(start=start, end=self.location)
+                    source_range = SourceRange(start=start, end=copy(self.location))
                     yield Token(kind=reserved_operators[op], source_range=source_range)
                     continue
 
                 # Build other "custom" operators.
-                source_range = SourceRange(start=start, end=self.location)
+                source_range = SourceRange(start=start, end=copy(self.location))
                 yield Token(kind=TokenKind.operator, source_range=source_range, value=op)
                 continue
 
             self.skip()
             yield Token(
                 kind=TokenKind.unknown,
-                source_range=SourceRange(start=start, end=self.location),
+                source_range=SourceRange(start=start, end=copy(self.location)),
                 value=char)
 
 
