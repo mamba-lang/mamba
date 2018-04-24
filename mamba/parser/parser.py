@@ -61,11 +61,12 @@ class Parser(object):
     def rewind_to(self, position: int):
         self.stream_position = position
 
-    def unexpected_token(self, expected: str = None):
-        return exc.UnexpectedToken(expected=expected, source_range=self.peek().source_range)
+    def unexpected_token(self, expected: str):
+        token = self.peek()
+        return exc.UnexpectedToken(expected=expected, got=token, source_range=token.source_range)
 
     def expected_identifier(self):
-        return exc.ExpectedIdentifier(source_range=self.peek().source_range)
+        return self.unexpected_token(expected='identifier')
 
     def attempt(self, parser: callable) -> ast.Node:
         backtrack = self.stream_position
@@ -138,7 +139,7 @@ class Parser(object):
         elif token.kind == TokenKind.type:
             return self.parse_type_declaration()
         else:
-            raise exc.ExpectedDeclaration(source_range=token.source_range)
+            raise self.unexpected_token(expected='declaration')
 
     def parse_function_declaration(self) -> ast.FunctionDeclaration:
         # Parse the `func` keyword.

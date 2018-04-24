@@ -53,6 +53,9 @@ class TokenKind(Enum):
     unterminated_string_literal = 'unterminated_string_literal'
     unknown = 'unknown'
 
+    def __str__(self):
+        return self.value
+
 
 class Token(object):
 
@@ -66,6 +69,6 @@ class Token(object):
 
     def __repr__(self):
         if self.value is not None:
-            return f'<{self.kind} {self.value}>'
+            return f'{self.kind}:{self.value}'
         else:
-            return f'<{self.kind}>'
+            return f'{self.kind}'
