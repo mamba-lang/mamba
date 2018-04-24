@@ -192,7 +192,7 @@ def is_alnum_or_underscore(char: str) -> bool:
 
 
 def is_operator(char: str) -> bool:
-    return char in '*@/%+-<>=!~&^|.,:;({[]})'
+    return char in '*@/%+-<>=!?~&^|.,:;({[]})'
 
 
 reserved_keywords = {
