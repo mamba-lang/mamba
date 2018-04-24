@@ -1,4 +1,5 @@
 from .nodes import *
+from .visitor import Visitor
 
 __all__ = (
     Binding,
@@ -24,4 +25,6 @@ __all__ = (
     TypeDeclaration,
     UnionType,
     WhenCase,
+
+    Visitor,
 )
