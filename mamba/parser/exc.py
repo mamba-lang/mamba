@@ -1,4 +1,4 @@
-from mamba.lexer import SourceRange
+from mamba.lexer import SourceRange, Token
 
 
 class ParseError(Exception):
@@ -26,6 +26,12 @@ class ExpectedDeclaration(ParseError):
         super().__init__(source_range)
 
 
+class ImbalancedParenthesis(ParseError):
+
+    def __init__(self, source_range: SourceRange):
+        super().__init__(source_range)
+
+
 class UnexpectedToken(ParseError):
 
     def __init__(self, expected: str, source_range: SourceRange):
@@ -33,7 +39,8 @@ class UnexpectedToken(ParseError):
         self.expected = expected
 
 
-class ImbalancedParenthesis(ParseError):
+class UnknownOperator(ParseError):
 
-    def __init__(self, source_range: SourceRange):
-        super().__init__(source_range)
+    def __init__(self, operator: Token):
+        super().__init__(operator.source_range)
+        self.token = operator

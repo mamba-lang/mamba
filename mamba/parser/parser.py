@@ -31,7 +31,7 @@ class Parser(object):
             '!' : { 'precedence': 90, 'associativity': 'left' },
         }
         self.prefix_operators = { '+', '-' }
-        self.postfix_operators = { '!', '?', '+' }
+        self.postfix_operators = { '!', '?' }
 
     def peek(self) -> Token:
         return self.stream[self.stream_position]
@@ -318,9 +318,11 @@ class Parser(object):
             backtrack = self.stream_position
             self.consume_newlines()
             operator = self.consume(TokenKind.operator)
-            if (operator is None) or (operator.value not in self.infix_operators):
+            if operator is None:
                 self.rewind_to(backtrack)
                 break
+            if operator.value not in self.infix_operators:
+                raise exc.UnknownOperator(operator=operator)
 
             # Parse the right operand.
             right = self.parse_atom()
