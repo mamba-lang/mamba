@@ -161,7 +161,7 @@ class Lexer(object):
                     continue
 
                 # Check for reserved operators.
-                op = self.take_while(is_operator)
+                op = self.take_while(lambda o: is_operator(o) and not o in single_char_operators)
                 if op in reserved_operators:
                     source_range = SourceRange(start=start, end=self.location)
                     yield Token(kind=reserved_operators[op], source_range=source_range)
@@ -218,9 +218,7 @@ reserved_keywords = {
     'catch'    : TokenKind.catch,
 }
 
-
 single_char_operators = {
-    '|'        : TokenKind.or_,
     ','        : TokenKind.comma,
     ';'        : TokenKind.semicolon,
     ':'        : TokenKind.colon,
@@ -233,6 +231,7 @@ single_char_operators = {
 }
 
 reserved_operators = {
+    '|'        : TokenKind.or_,
     '='        : TokenKind.bind,
     '->'       : TokenKind.arrow,
     '=>'       : TokenKind.bold_arrow,
