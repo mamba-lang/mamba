@@ -87,15 +87,20 @@ class FunctionDeclaration(Node):
 
 class TypeDeclaration(Node):
 
-    _fields = ('name', 'body',)
+    _fields = ('name', 'placeholders', 'body',)
 
-    def __init__(self, name: str, body: Node, source_range: SourceRange):
+    def __init__(self, name: str, placeholders: list, body: Node, source_range: SourceRange):
         super().__init__(source_range)
         self.name = name
+        self.placeholders = placeholders
         self.body = body
 
     def __str__(self) -> str:
-        return f'type {self.name} = {self.body}'
+        if self.placeholders:
+            placeholders = '[ ' + ', '.join(self.placeholders) + ' ]'
+        else:
+            placeholders = ''
+        return f'type {self.name}{placeholders} = {self.body}'
 
 
 class ClosureExpression(Node):

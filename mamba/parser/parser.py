@@ -218,6 +218,15 @@ class Parser(object):
         if name_token is None:
             raise self.expected_identifier()
 
+        # Parse the optional placeholders.
+        self.consume_newlines()
+        if self.consume(TokenKind.lbracket) is not None:
+            placeholders = self.parse_sequence(TokenKind.rbracket, self.parse_placeholder)
+            if self.consume(TokenKind.rbracket) is None:
+                raise self.unexpected_token(expected=']')
+        else:
+            placeholders = []
+
         # Parse the binding operator.
         self.consume_newlines()
         if self.consume(TokenKind.bind) is None:
@@ -228,6 +237,7 @@ class Parser(object):
 
         return ast.TypeDeclaration(
             name=name_token.value,
+            placeholders=placeholders,
             body=body,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=body.source_range.end))
