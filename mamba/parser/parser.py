@@ -169,7 +169,7 @@ class Parser(object):
             # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
             prop = self.attempt(self.parse_object_property)
             if prop is not None:
-                domain = ast.ObjectType(members=[prop], source_range=prop.source_range)
+                domain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
             else:
                 domain = self.parse_annotation()
 
@@ -186,7 +186,7 @@ class Parser(object):
             # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
             prop = self.attempt(self.parse_object_property)
             if prop is not None:
-                codomain = ast.ObjectType(members=[prop], source_range=prop.source_range)
+                codomain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
             else:
                 codomain = self.parse_annotation()
 
@@ -300,13 +300,13 @@ class Parser(object):
             raise self.unexpected_token(expected='{')
 
         # Parse the key/value pairs of the type.
-        members = self.parse_sequence(TokenKind.rbrace, self.parse_object_property)
+        properties = self.parse_sequence(TokenKind.rbrace, self.parse_object_property)
         end_token = self.consume(TokenKind.rbrace)
         if end_token is None:
             raise self.unexpected_token(expected='}')
 
         return ast.ObjectType(
-            members=members,
+            properties=properties,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=end_token.source_range.end))
 
@@ -535,7 +535,7 @@ class Parser(object):
             # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
             prop = self.attempt(self.parse_object_property)
             if prop is not None:
-                domain = ast.ObjectType(members=[prop], source_range=prop.source_range)
+                domain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
             else:
                 domain = self.parse_annotation()
 
@@ -549,7 +549,7 @@ class Parser(object):
                 # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
                 prop = self.attempt(self.parse_object_property)
                 if prop is not None:
-                    codomain = ast.ObjectType(members=[prop], source_range=prop.source_range)
+                    codomain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
                 else:
                     codomain = self.parse_annotation()
         else:

@@ -46,14 +46,14 @@ class Module(Node):
 
 class ObjectType(Node):
 
-    _fields = ('members',)
+    _fields = ('properties',)
 
-    def __init__(self, members: list, source_range: SourceRange):
+    def __init__(self, properties: list, source_range: SourceRange):
         super().__init__(source_range)
-        self.members = members
+        self.properties = properties
 
     def __str__(self) -> str:
-        return '{ ' + ', '.join([str(m) for m in self.members]) + ' }'
+        return '{ ' + ', '.join([str(p) for p in self.properties]) + ' }'
 
 
 class UnionType(Node):

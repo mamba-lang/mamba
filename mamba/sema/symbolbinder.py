@@ -44,14 +44,14 @@ class SymbolBinder(ast.Visitor):
             self.scopes[-1].insert(Symbol(name=placeholder, type=ty))
 
         if isinstance(node.domain, ast.ObjectType):
-            for member in node.domain.members:
-                if self.scopes[-1].contains(lambda s: s.name == member.name):
+            for prop in node.domain.properties:
+                if self.scopes[-1].contains(lambda s: s.name == prop.name):
                     self.errors.append(exc.DuplicateDeclaration(
-                        name=member.name, source_range=member.source_range))
+                        name=prop.name, source_range=prop.source_range))
                     continue
-                parameter_symbol = Symbol(name=member.name)
+                parameter_symbol = Symbol(name=prop.name)
                 self.scopes[-1].insert(parameter_symbol)
-                member.symbol = parameter_symbol
+                prop.symbol = parameter_symbol
 
         # Visit the innards of the function declaration.
         self.generic_visit(node)
@@ -61,7 +61,7 @@ class SymbolBinder(ast.Visitor):
         # Add the name of the type to the current scope.
         symbol = self.scopes[-1].first(where=lambda s: s.name == node.name)
         if symbol is None:
-            symbol = Symbol(name=node.name, overloadable=True)
+            symbol = Symbol(name=node.name, type=types.TypeAlias(types.TypeVariable()))
             self.scopes[-1].insert(symbol)
         else:
             self.errors.append(exc.DuplicateDeclaration(
