@@ -1,6 +1,7 @@
 from mamba import ast
 
 from . import exc
+from . import types
 
 
 class SymbolBinder(ast.Visitor):
@@ -38,7 +39,8 @@ class SymbolBinder(ast.Visitor):
 
         # Insert the function arguments and generic placeholders into its scope.
         for placeholder in node.placeholders:
-            self.scopes[-1].insert(Symbol(name=placeholder))
+            ty = types.TypePlaceholder(name=placeholder)
+            self.scopes[-1].insert(Symbol(name=placeholder, type=ty))
 
         if isinstance(node.domain, ast.ObjectType):
             for member in node.domain.members:
@@ -69,7 +71,8 @@ class SymbolBinder(ast.Visitor):
         # Push a new scope for the type itself, and insert its generic placeholders into.
         self.scopes.append(Scope(parent=self.scopes[-1]))
         for placeholder in node.placeholders:
-            self.scopes[-1].insert(Symbol(name=placeholder))
+            ty = types.TypePlaceholder(name=placeholder)
+            self.scopes[-1].insert(Symbol(name=placeholder, type=ty))
 
         # Visit the innards of the type declaration.
         self.generic_visit(node)
@@ -116,11 +119,12 @@ class Scope(object):
 
 
 builtin_scope = Scope(symbols={
-    Symbol(name='Object'),
-    Symbol(name='Bool'),
-    Symbol(name='Int'),
-    Symbol(name='Float'),
-    Symbol(name='String'),
+    Symbol(name='Object', type=types.TypeAlias(types.ObjectType())),
+    Symbol(name='Bool'  , type=types.TypeAlias(types.Bool)),
+    Symbol(name='Int'   , type=types.TypeAlias(types.Int)),
+    Symbol(name='Float' , type=types.TypeAlias(types.Float)),
+    Symbol(name='String', type=types.TypeAlias(types.String)),
     Symbol(name='List'),
     Symbol(name='Set'),
+    Symbol(name='print'),
 })
