@@ -14,15 +14,10 @@ class TypedNode(object):
 
     @property
     def type(self):
-        if isinstance(self, NamedNode):
-            return self.symbol.type if self.symbol is not None else None
         return getattr(self, '_type', None)
 
     @type.setter
     def type(self, value):
-        if isinstance(self, NamedNode):
-            self.symbol.type = value
-            return
         setattr(self, '_type', value)
 
 
