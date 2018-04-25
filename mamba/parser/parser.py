@@ -351,8 +351,14 @@ class Parser(object):
             if operator.value not in self.infix_operators:
                 raise exc.UnknownOperator(operator=operator)
 
-            # Parse the right operand.
-            right = self.parse_atom()
+            # The infix operators `.`, `?` or `!` represent attribute retrieval expressions. Just
+            # like object keys, an identifier with no specializers on the right operand of an
+            # attribute retrieval expression is interpreted as a character string by default.
+            # Hence, we need to treat this syntactic sugar case here.
+            if operator.value in { '.', '?', '!' }:
+                right = self.parse_attribute_name()
+            else:
+                right = self.parse_atom()
 
             # If the left operand is an infix expression, we should check the precedence and
             # associativity of its operator against the current one.
@@ -759,16 +765,13 @@ class Parser(object):
             raise self.unexpected_token(expected='}')
 
         return ast.ObjectLiteral(
-            items={ key: value for key, value in items },
+            items=items,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=end_token.source_range.end))
 
     def parse_object_literal_item(self) -> tuple:
         # Parse the name of the item.
-        name_token = self.consume()
-        if (name_token is None) or (name_token.kind != TokenKind.identifier):
-            raise self.expected_identifier()
-        name = name_token.value
+        name = self.parse_attribute_name()
 
         # Parse the binding operator.
         self.consume_newlines()
@@ -778,6 +781,27 @@ class Parser(object):
         # Parse the value of the item.
         value = self.parse_expression()
         return (name, value)
+
+    def parse_attribute_name(self) -> str:
+        # Parse an scalar literal or an expression enclosed in brackets.
+        start_token = self.peek()
+
+        if start_token.kind in ({ TokenKind.identifier } | scalar_literal_kinds):
+            name = self.consume()
+            return ast.ScalarLiteral(value=name.value, source_range=name.source_range)
+
+        if start_token.kind == TokenKind.lbracket:
+            self.consume()
+            self.consume_newlines()
+            attr = self.parse_expression()
+            self.consume_newlines()
+            end_token = self.consume(TokenKind.rbracket)
+            if end_token is None:
+                raise self.unexpected_token(expected=']')
+            return attr
+
+        # Any other expression isn't a valid attribute name.
+        raise self.expected_identifier()
 
 
 scalar_literal_kinds = {

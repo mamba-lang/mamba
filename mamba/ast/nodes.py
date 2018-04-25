@@ -300,6 +300,8 @@ class ScalarLiteral(Node, TypedNode):
     def __str__(self) -> str:
         if isinstance(self.value, str):
             return f'"{self.value}"'
+        if isinstance(self.value, bool):
+            return 'true' if self.value else 'false'
         return str(self.value)
 
 
@@ -320,13 +322,18 @@ class ObjectLiteral(Node, TypedNode):
 
     _fields = ('items',)
 
-    def __init__(self, items: dict, source_range: SourceRange):
+    def __init__(self, items: list, source_range: SourceRange):
         super().__init__(source_range)
         self.items = items
 
     def __str__(self) -> str:
-        items = ', '.join([f'{key} = {value}' for key, value in self.items.items()])
-        return '{ ' + items + ' }'
+        pairs = []
+        for key, value in self.items:
+            if isinstance(key, ScalarLiteral):
+                pairs.append(f'{key}: {value}')
+            else:
+                pairs.append((f'[ {key} ]: {value}'))
+        return '{ ' + ', '.join(pairs) + ' }'
 
 
 class Nothing(Node):
