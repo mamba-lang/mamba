@@ -10,6 +10,33 @@ class Node(object):
         self.source_range = source_range
 
 
+class TypedNode(object):
+
+    @property
+    def type(self):
+        if isinstance(self, NamedNode):
+            return self.symbol.type if self.symbol is not None else None
+        return getattr(self, '_type', None)
+
+    @type.setter
+    def type(self, value):
+        if isinstance(self, NamedNode):
+            self.symbol.type = value
+            return
+        setattr(self, '_type', value)
+
+
+class NamedNode(object):
+
+    @property
+    def symbol(self):
+        return getattr(self, '_symbol', None)
+
+    @symbol.setter
+    def symbol(self, value):
+        setattr(self, '_symbol', value)
+
+
 class Module(Node):
 
     _fields = ('declarations',)
@@ -61,7 +88,7 @@ class ObjectProperty(Node):
         return self.name
 
 
-class FunctionDeclaration(Node):
+class FunctionDeclaration(Node, NamedNode):
 
     _fields = ('name', 'placeholders', 'domain', 'codomain', 'body',)
 
@@ -85,7 +112,7 @@ class FunctionDeclaration(Node):
         return f'func {self.name}{placeholders} {self.domain} -> {self.codomain} = {self.body}'
 
 
-class TypeDeclaration(Node):
+class TypeDeclaration(Node, NamedNode):
 
     _fields = ('name', 'placeholders', 'body',)
 
@@ -103,7 +130,7 @@ class TypeDeclaration(Node):
         return f'type {self.name}{placeholders} = {self.body}'
 
 
-class ClosureExpression(Node):
+class ClosureExpression(Node, TypedNode):
 
     _fields = ('domain', 'codomain', 'body',)
 
@@ -120,7 +147,7 @@ class ClosureExpression(Node):
         return result + f' => {self.body}'
 
 
-class InfixExpression(Node):
+class InfixExpression(Node, TypedNode):
 
     _fields = ('operator', 'left', 'right',)
 
@@ -134,7 +161,7 @@ class InfixExpression(Node):
         return f'{self.left} {self.operator.value} {self.right}'
 
 
-class PrefixExpression(Node):
+class PrefixExpression(Node, TypedNode):
 
     _fields = ('operator', 'operand',)
 
@@ -147,7 +174,7 @@ class PrefixExpression(Node):
         return f'{self.operator.value}{self.operand}'
 
 
-class PostfixExpression(Node):
+class PostfixExpression(Node, TypedNode):
 
     _fields = ('operator', 'operand',)
 
@@ -160,7 +187,7 @@ class PostfixExpression(Node):
         return f'{self.operand}{self.operator.value}'
 
 
-class CallExpression(Node):
+class CallExpression(Node, TypedNode):
 
     _fields = ('callee', 'argument',)
 
@@ -175,7 +202,7 @@ class CallExpression(Node):
         return f'{self.callee} _'
 
 
-class IfExpression(Node):
+class IfExpression(Node, TypedNode):
 
     _fields = ('condition', 'then', 'else_')
 
@@ -189,7 +216,7 @@ class IfExpression(Node):
         return f'if {self.condition} then {self.then} else {self.else_}'
 
 
-class MatchExpression(Node):
+class MatchExpression(Node, TypedNode):
 
     _fields = ('subject', 'cases',)
 
@@ -230,7 +257,7 @@ class ElseCase(Node):
         return f'else {self.body}'
 
 
-class Binding(Node):
+class Binding(Node, TypedNode):
 
     _fields = ('name', 'annotation',)
 
@@ -245,7 +272,7 @@ class Binding(Node):
         return f'let {self.name}'
 
 
-class Identifier(Node):
+class Identifier(Node, TypedNode, NamedNode):
 
     _fields = ('name',)
 
@@ -262,7 +289,7 @@ class Identifier(Node):
             return self.name
 
 
-class ScalarLiteral(Node):
+class ScalarLiteral(Node, TypedNode):
 
     _fields = tuple()
 
@@ -276,7 +303,7 @@ class ScalarLiteral(Node):
         return str(self.value)
 
 
-class ListLiteral(Node):
+class ListLiteral(Node, TypedNode):
 
     _fields = ('items',)
 
@@ -289,7 +316,7 @@ class ListLiteral(Node):
         return f'[ {items} ]'
 
 
-class ObjectLiteral(Node):
+class ObjectLiteral(Node, TypedNode):
 
     _fields = ('items',)
 
