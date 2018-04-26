@@ -13,28 +13,30 @@ class Scope(object):
 
     def __init__(self, parent = None, symbols = None):
         self.parent = parent
-        self.symbols = set(symbols) if symbols is not None else set()
+        self.symbols = symbols if symbols is not None else {}
 
     def insert(self, symbol: Symbol):
-        self.symbols.add(symbol)
+        self.symbols[symbol.name] = self.symbols.get(symbol.name, []) + [symbol]
 
     def contains(self, predicate: callable) -> bool:
         return self.first(where=predicate) is not None
 
     def first(self, where: callable) -> Symbol:
-        for symbol in self.symbols:
-            if where(symbol):
-                return symbol
+        for name in self.symbols:
+            for symbol in self.symbols[name]:
+                if where(symbol):
+                    return symbol
         return None
 
 
 builtin_scope = Scope(symbols={
-    Symbol(name='Object', type=types.TypeAlias(types.ObjectType())),
-    Symbol(name='Bool'  , type=types.TypeAlias(types.Bool)),
-    Symbol(name='Int'   , type=types.TypeAlias(types.Int)),
-    Symbol(name='Float' , type=types.TypeAlias(types.Float)),
-    Symbol(name='String', type=types.TypeAlias(types.String)),
-    Symbol(name='List'),
-    Symbol(name='Set'),
-    Symbol(name='print'),
+    'Object': [Symbol(name='Object', type=types.TypeAlias(types.ObjectType()))],
+    'Bool'  : [Symbol(name='Bool'  , type=types.TypeAlias(types.Bool))],
+    'Int'   : [Symbol(name='Int'   , type=types.TypeAlias(types.Int))],
+    'Float' : [Symbol(name='Float' , type=types.TypeAlias(types.Float))],
+    'String': [Symbol(name='String', type=types.TypeAlias(types.String))],
+    'List'  : [Symbol(name='List'  , type=types.TypeAlias(types.List))],
+    'Set'   : [Symbol(name='Set'   , type=types.TypeAlias(types.Set))],
+    'print' : [Symbol(name='print' , type=types.FunctionType(
+        domain=types.ObjectType({ 'item': types.ObjectType() }), codomain=types.Nothing))],
 })
