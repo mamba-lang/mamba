@@ -5,7 +5,7 @@ class Symbol(object):
 
     def __init__(self, name: str, type = None, overloadable: bool = False):
         self.name = name
-        self.type = type
+        self.type = type or types.TypeVariable()
         self.overloadable = overloadable
 
 
