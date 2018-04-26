@@ -76,11 +76,13 @@ class FunctionType(object):
             placeholders = '[ ' + ', '.join(self.placeholders) + ' ]'
         else:
             placeholders = ''
-
         return placeholders + f'{self.domain} -> {self.codomain}'
 
 
-Bool   = GroundType('Bool')
-Int    = GroundType('Int')
-Float  = GroundType('Float')
-String = GroundType('String')
+Nothing = GroundType('Nothing')
+Bool    = GroundType('Bool')
+Int     = GroundType('Int')
+Float   = GroundType('Float')
+String  = GroundType('String')
+List    = GroundType('List', placeholders=['Element'])
+Set     = GroundType('Set', placeholders=['Element'])
