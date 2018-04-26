@@ -48,8 +48,35 @@ class ObjectType(object):
             placeholders = '[ ' + ', '.join(self.placeholders) + ' ]'
         else:
             placeholders = ''
-        props = [f'{key}: {value}' for key, value in self.properties.items()]
+
+        # FIXME: Handle infinite recursions in the object representation.
+        props = [f'{key}: _' for key, _ in self.properties.items()]
         return placeholders + '{ ' + ', '.join(props) + ' }'
+
+
+class UnionType(object):
+
+    def __init__(self, types):
+        self.types = types
+
+    def __str__(self) -> str:
+        return ' | '.join([str(t) for t in self.types])
+
+
+class FunctionType(object):
+
+    def __init__(self, domain, codomain, placeholders=None):
+        self.domain = domain
+        self.codomain = codomain
+        self.placeholders = placeholders
+
+    def __str__(self) -> str:
+        if self.placeholders:
+            placeholders = '[ ' + ', '.join(self.placeholders) + ' ]'
+        else:
+            placeholders = ''
+
+        return placeholders + f'{self.domain} -> {self.codomain}'
 
 
 Bool   = GroundType('Bool')
