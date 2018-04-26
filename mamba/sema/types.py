@@ -1,19 +1,20 @@
 class GroundType(object):
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, placeholders=None):
         self.name = name
+        self.placeholders = placeholders or []
 
     def __str__(self) -> str:
-        return self.name
-
-    def __repr__(self) -> str:
-        return str(self)
+        if self.placeholders:
+            return '[ ' + ', '.join(self.placeholders) + ' ]' + self.name
+        else:
+            return self.name
 
 
 class TypeVariable(object):
 
-    def __repr__(self) -> str:
-        return str(self)
+    def __str__(self) -> str:
+        return hex(id(self))[-6:]
 
 
 class TypeAlias(object):
