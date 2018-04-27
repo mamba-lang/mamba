@@ -1,20 +1,29 @@
-class GroundType(object):
+class Type(object):
+
+    def __str__(self) -> str:
+        return self.to_string(set())
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+class GroundType(Type):
 
     def __init__(self, name: str, placeholders=None):
         self.name = name
         self.placeholders = placeholders or []
 
-    def __str__(self) -> str:
+    def to_string(self, memo: set) -> str:
         if self.placeholders:
             return '[ ' + ', '.join(self.placeholders) + ' ]' + self.name
         else:
             return self.name
 
 
-class TypeVariable(object):
+class TypeVariable(Type):
 
-    def __str__(self) -> str:
-        return hex(id(self))[-6:]
+    def to_string(self, memo: set) -> str:
+        return '__' + hex(id(self))[-6:]
 
 
 class TypeAlias(object):
@@ -22,61 +31,61 @@ class TypeAlias(object):
     def __init__(self, subject):
         self.subject = subject
 
-    def __str__(self) -> str:
-        return str(self.subject)
-
-    def __repr__(self) -> str:
-        return str(self)
+    def to_string(self, memo: set) -> str:
+        return f'~{self.subject.to_string(memo)}'
 
 
-class TypePlaceholder(object):
+class TypePlaceholder(Type):
 
     def __init__(self, name: str):
         self.name = name
 
-    def __str__(self) -> str:
+    def to_string(self, memo: set) -> str:
         return self.name
 
 
-class ObjectType(object):
+class ObjectType(Type):
 
     def __init__(self, properties=None, placeholders=None):
         self.properties = properties or {}
         self.placeholders = placeholders or []
 
-    def __str__(self) -> str:
+    def to_string(self, memo: set) -> str:
         if self.placeholders:
             placeholders = '[ ' + ', '.join(self.placeholders) + ' ]'
         else:
             placeholders = ''
 
-        # FIXME: Handle infinite recursions in the object representation.
-        props = [f'{key}: _' for key, _ in self.properties.items()]
+        if self in memo:
+            return placeholders + '{ ... }'
+        memo.add(self)
+
+        props = [f'{key}: {value.to_string(memo)}' for key, value in self.properties.items()]
         return placeholders + '{ ' + ', '.join(props) + ' }'
 
 
-class UnionType(object):
+class UnionType(Type):
 
     def __init__(self, types):
         self.types = types
 
-    def __str__(self) -> str:
-        return ' | '.join([str(t) for t in self.types])
+    def to_string(self, memo: set) -> str:
+        return ' | '.join([t.to_string(memo) for t in self.types])
 
 
-class FunctionType(object):
+class FunctionType(Type):
 
     def __init__(self, domain, codomain, placeholders=None):
         self.domain = domain
         self.codomain = codomain
         self.placeholders = placeholders
 
-    def __str__(self) -> str:
+    def to_string(self, memo: set) -> str:
         if self.placeholders:
             placeholders = '[ ' + ', '.join(self.placeholders) + ' ]'
         else:
             placeholders = ''
-        return placeholders + f'{self.domain} -> {self.codomain}'
+        return placeholders + f'{self.domain.to_string(memo)} -> {self.codomain.to_string(memo)}'
 
 
 Nothing = GroundType('Nothing')
