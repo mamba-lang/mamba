@@ -28,6 +28,9 @@ class Scope(object):
                     return symbol
         return None
 
+    def __getitem__(self, name):
+        return self.symbols.get(name)
+
 
 builtin_scope = Scope(symbols={
     'Object': [Symbol(name='Object', type=types.TypeAlias(types.ObjectType()))],

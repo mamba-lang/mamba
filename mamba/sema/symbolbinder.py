@@ -7,7 +7,7 @@ from .symbol import Scope, Symbol, builtin_scope
 
 class SymbolBinder(ast.Visitor):
     """
-    The static analysis pass that binds all identifiers to a particular symbol.
+    Static analysis pass that binds all identifiers to a particular symbol.
 
     This steps allows to check for unbound variables, duplicate declarations, and is also required
     to perform type inference, so as to map type aliases to their respective definition.
@@ -82,9 +82,8 @@ class SymbolBinder(ast.Visitor):
     def visit_Identifier(self, node):
         # Look for the symbol to which bind the identifier.
         for scope in reversed(self.scopes):
-            symbol = scope.first(where=lambda s: s.name == node.name)
-            if symbol is not None:
-                node.symbol = symbol
+            if scope.contains(predicate=lambda s: s.name == node.name):
+                node.scope = scope
                 self.generic_visit(node)
                 return
 
