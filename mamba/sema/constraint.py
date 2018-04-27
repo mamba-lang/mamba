@@ -20,8 +20,10 @@ class Constraint(object):
         # assignment of the placeholders in T1 makes T1 conform to T2.
         specialize = 2
 
-    def __init__(self, kind, lhs, rhs, source_range):
+        # A dusjunction of constraints.
+        disjunction = 3
+
+    def __init__(self, kind, source_range=None, **kwargs):
         self.kind = kind
-        self.lhs = lhs
-        self.rhs = rhs
+        self.kwargs = kwargs
         self.source_range = source_range

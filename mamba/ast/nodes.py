@@ -276,6 +276,11 @@ class Identifier(Node, TypedNode, NamedNode):
         self.name = name
         self.specializers = specializers
 
+        # Altough they are named nodes, identifiers aren't associated with a symbol directly (i.e.
+        # during symbol binding) because of overloading. Instead, we bind them to a scope which
+        # contains all the symbols it may be bound to once type inference finishes.
+        self.scope = None
+
     def __str__(self) -> str:
         if self.specializers:
             specs = ', '.join(f'{key} = {value}' for key, value in self.specializers.items())
