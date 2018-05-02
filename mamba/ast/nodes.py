@@ -32,7 +32,18 @@ class NamedNode(object):
         setattr(self, '_symbol', value)
 
 
-class Module(Node):
+class ScopeNode(object):
+
+    @property
+    def inner_scope(self):
+        return getattr(self, '_inner_scope', None)
+
+    @inner_scope.setter
+    def inner_scope(self, value):
+        setattr(self, '_inner_scope', value)
+
+
+class Module(Node, ScopeNode):
 
     _fields = ('declarations',)
 
@@ -83,7 +94,7 @@ class ObjectProperty(Node):
         return self.name
 
 
-class FunctionDeclaration(Node, NamedNode):
+class FunctionDeclaration(Node, NamedNode, ScopeNode):
 
     _fields = ('name', 'placeholders', 'domain', 'codomain', 'body',)
 
@@ -107,7 +118,7 @@ class FunctionDeclaration(Node, NamedNode):
         return f'func {self.name}{placeholders} {self.domain} -> {self.codomain} = {self.body}'
 
 
-class TypeDeclaration(Node, NamedNode):
+class TypeDeclaration(Node, NamedNode, ScopeNode):
 
     _fields = ('name', 'placeholders', 'body',)
 
@@ -125,7 +136,7 @@ class TypeDeclaration(Node, NamedNode):
         return f'type {self.name}{placeholders} = {self.body}'
 
 
-class ClosureExpression(Node, TypedNode):
+class ClosureExpression(Node, TypedNode, ScopeNode):
 
     _fields = ('domain', 'codomain', 'body',)
 
@@ -197,7 +208,7 @@ class CallExpression(Node, TypedNode):
         return f'{self.callee} _'
 
 
-class IfExpression(Node, TypedNode):
+class IfExpression(Node, TypedNode, ScopeNode):
 
     _fields = ('condition', 'then', 'else_')
 
@@ -227,7 +238,7 @@ class MatchExpression(Node, TypedNode):
         return f'match {self.subject}\n{cases}'
 
 
-class WhenCase(Node):
+class WhenCase(Node, ScopeNode):
 
     _fields = ('pattern', 'body',)
 
