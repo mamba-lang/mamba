@@ -12,6 +12,8 @@ class ScopeBuilder(ast.Visitor):
 
     This steps allows the scope binder to then bind identifiers to their correct scope and to
     identify unbound symbols.
+
+    FIXME: Process other scope nodes (e.g. if-expressions).
     """
 
     def __init__(self):
@@ -20,7 +22,8 @@ class ScopeBuilder(ast.Visitor):
 
     def visit_Module(self, node):
         # Push a new scope, so that symbols of the module can shadow built-in ones.
-        self.scopes.append(Scope(parent=self.scopes[-1]))
+        node.inner_scope = Scope(parent=self.scopes[-1])
+        self.scopes.append(node.inner_scope)
         self.generic_visit(node)
         self.scopes.pop()
 
@@ -37,7 +40,8 @@ class ScopeBuilder(ast.Visitor):
         node.symbol = symbol
 
         # Push a new scope for the function itself.
-        self.scopes.append(Scope(parent=self.scopes[-1]))
+        node.inner_scope = Scope(parent=self.scopes[-1])
+        self.scopes.append(node.inner_scope)
 
         # Insert the function arguments and generic placeholders into its scope.
         for placeholder in node.placeholders:
@@ -70,8 +74,11 @@ class ScopeBuilder(ast.Visitor):
             return
         node.symbol = symbol
 
-        # Push a new scope for the type itself, and insert its generic placeholders into.
-        self.scopes.append(Scope(parent=self.scopes[-1]))
+        # Push a new scope for the type itself.
+        node.inner_scope = Scope(parent=self.scopes[-1])
+        self.scopes.append(node.inner_scope)
+
+        # Insert the type generic placeholders into its scope.
         for placeholder in node.placeholders:
             ty = types.TypePlaceholder(name=placeholder)
             self.scopes[-1].insert(Symbol(name=placeholder, type=ty))
@@ -79,20 +86,3 @@ class ScopeBuilder(ast.Visitor):
         # Visit the innards of the type declaration.
         self.generic_visit(node)
         self.scopes.pop()
-
-
-class ScopeBinder(ast.Visitor):
-    """
-    Static analysis pass that binds all identifiers to a particular symbol (and scope).
-    """
-
-    def visit_Identifier(self, node):
-        # Look for the symbol to which bind the identifier.
-        for scope in reversed(self.scopes):
-            if scope.contains(predicate=lambda s: s.name == node.name):
-                node.scope = scope
-                self.generic_visit(node)
-                return
-
-        # The identifier is unbound.
-        self.errors.append(exc.UnboundName(name=node.name, source_range=node.source_range))

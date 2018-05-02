@@ -28,6 +28,13 @@ class Scope(object):
                     return symbol
         return None
 
+    def find_scope_of(self, name) -> Symbol:
+        if name in self.symbols:
+            return self
+        if self.parent:
+            return self.parent.find_scope_of(name)
+        return None
+
     def __getitem__(self, name):
         return self.symbols.get(name)
 
