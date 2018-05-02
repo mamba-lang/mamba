@@ -43,20 +43,11 @@ class ScopeBuilder(ast.Visitor):
         node.inner_scope = Scope(parent=self.scopes[-1])
         self.scopes.append(node.inner_scope)
 
-        # Insert the function arguments and generic placeholders into its scope.
+        # Insert the function argument reference and generic placeholders into its scope.
         for placeholder in node.placeholders:
             ty = types.TypePlaceholder(name=placeholder)
             self.scopes[-1].insert(Symbol(name=placeholder, type=ty))
-
-        if isinstance(node.domain, ast.ObjectType):
-            for prop in node.domain.properties:
-                if self.scopes[-1].contains(lambda s: s.name == prop.name):
-                    self.errors.append(exc.DuplicateDeclaration(
-                        name=prop.name, source_range=prop.source_range))
-                    continue
-                parameter_symbol = Symbol(name=prop.name)
-                self.scopes[-1].insert(parameter_symbol)
-                prop.symbol = parameter_symbol
+        self.scopes[-1].insert(Symbol(name='$'))
 
         # Visit the innards of the function declaration.
         self.generic_visit(node)

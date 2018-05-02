@@ -1,5 +1,8 @@
 class Type(object):
 
+    def to_string(self, memo: set) -> str:
+        return f'<Type at {hex(id(self))}>'
+
     def __str__(self) -> str:
         return self.to_string(set())
 
@@ -22,8 +25,14 @@ class GroundType(Type):
 
 class TypeVariable(Type):
 
+    next_id = 0
+
+    def __init__(self):
+        self.id = TypeVariable.next_id
+        TypeVariable.next_id += 1
+
     def to_string(self, memo: set) -> str:
-        return '__' + hex(id(self))[-6:]
+        return f'__{self.id}'
 
 
 class TypeAlias(object):
@@ -62,6 +71,15 @@ class ObjectType(Type):
 
         props = [f'{key}: {value.to_string(memo)}' for key, value in self.properties.items()]
         return placeholders + '{ ' + ', '.join(props) + ' }'
+
+    def __len__(self):
+        return len(self.properties)
+
+    def __iter__(self):
+        return iter(self.properties)
+
+    def __getitem__(self, item):
+        return self.properties[item]
 
 
 class UnionType(Type):

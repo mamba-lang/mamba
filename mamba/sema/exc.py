@@ -26,3 +26,11 @@ class UnboundName(SemanticError):
     def __init__(self, name: str, source_range: SourceRange):
         super().__init__(source_range, name)
         self.name = name
+
+
+class UnificationError(SemanticError):
+
+    def __init__(self, lhs, rhs, message: str, source_range: SourceRange):
+        super().__init__(source_range, message)
+        self.lhs = lhs
+        self.rhs = rhs
