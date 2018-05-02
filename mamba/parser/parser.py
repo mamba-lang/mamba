@@ -398,29 +398,40 @@ class Parser(object):
             else:
                 right = self.parse_atom()
 
+            operator_identifier = ast.Identifier(
+                name=operator.value,
+                specializers=None,
+                source_range=operator.source_range)
+
             # If the left operand is an infix expression, we should check the precedence and
             # associativity of its operator against the current one.
             if isinstance(left, ast.InfixExpression):
-                lprec = self.infix_operators[left.operator.value]['precedence']
+                lprec = self.infix_operators[left.operator.name]['precedence']
                 rprec = self.infix_operators[operator.value]['precedence']
-                associativity = self.infix_operators[left.operator.value]['associativity']
+                associativity = self.infix_operators[left.operator.name]['associativity']
 
                 if ((lprec < rprec) or
-                    ((left.operator.value == operator.value) and (associativity == 'right'))):
+                    ((left.operator.name == operator.value) and (associativity == 'right'))):
 
                     new_right = ast.InfixExpression(
-                        operator=operator, left=left.right, right=right,
+                        operator=operator_identifier,
+                        left=left.right,
+                        right=right,
                         source_range=SourceRange(
                             start=left.right.source_range.start, end=right.source_range.end))
                     left = ast.InfixExpression(
-                        operator=left.operator, left=left.left, right=new_right,
+                        operator=left.operator,
+                        left=left.left,
+                        right=new_right,
                         source_range=SourceRange(
                             start=left.left.source_range.start, end=right.source_range.end))
                     continue
 
 
             left = ast.InfixExpression(
-                operator=operator, left=left, right=right,
+                operator=operator_identifier,
+                left=left,
+                right=right,
                 source_range=SourceRange(
                     start=left.source_range.start, end=right.source_range.end))
             continue
@@ -502,7 +513,7 @@ class Parser(object):
                     # the expression `b` (i.e. `a+ { _0 = b }`).
                     # We choose to desambiguise this situation by prioritizing infix expressions.
                     if isinstance(value, ast.PrefixExpression):
-                        if value.operator.value in self.infix_operators:
+                        if value.operator.name in self.infix_operators:
                             self.rewind_to(backtrack)
                             break
 
@@ -544,11 +555,15 @@ class Parser(object):
                         self.rewind_to(backtrack)
                         break
 
+                operator_identifier = ast.Identifier(
+                    name=operator.value,
+                    specializers=None,
+                    source_range=operator.source_range)
                 atom = ast.PostfixExpression(
-                    operator=operator,
+                    operator=operator_identifier,
                     operand=atom,
                     source_range=SourceRange(
-                        start=operator.source_range.start, end=atom.source_range.end))
+                        start=operator_identifier.source_range.start, end=atom.source_range.end))
                 continue
 
             self.rewind_to(backtrack)
@@ -562,12 +577,18 @@ class Parser(object):
         if (start_token is None) or (start_token.value not in self.prefix_operators):
             raise self.unexpected_token(expected='prefix operator')
 
+        operator_identifier = ast.Identifier(
+            name=start_token.value,
+            specializers=None,
+            source_range=start_token.source_range)
+
         # Parse the operand of the expression.
         operand = self.parse_expression()
         return ast.PrefixExpression(
-            operator=start_token, operand=operand,
+            operator=operator_identifier,
+            operand=operand,
             source_range=SourceRange(
-                start=start_token.source_range.start, end=operand.source_range.end))
+                start=operator_identifier.source_range.start, end=operand.source_range.end))
 
     def parse_closure_expression(self) -> ast.ClosureExpression:
         start_token = self.peek()

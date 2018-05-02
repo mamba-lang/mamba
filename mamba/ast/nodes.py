@@ -170,40 +170,40 @@ class InfixExpression(Node, TypedNode):
 
     _fields = ('operator', 'left', 'right',)
 
-    def __init__(self, operator: Token, left: Node, right: Node, source_range: SourceRange):
+    def __init__(self, operator: Node, left: Node, right: Node, source_range: SourceRange):
         super().__init__(source_range)
         self.operator = operator
         self.left = left
         self.right = right
 
     def __str__(self) -> str:
-        return f'{self.left} {self.operator.value} {self.right}'
+        return f'{self.left} {self.operator} {self.right}'
 
 
 class PrefixExpression(Node, TypedNode):
 
     _fields = ('operator', 'operand',)
 
-    def __init__(self, operator: Token, operand: Node, source_range: SourceRange):
+    def __init__(self, operator: Node, operand: Node, source_range: SourceRange):
         super().__init__(source_range)
         self.operator = operator
         self.operand = operand
 
     def __str__(self) -> str:
-        return f'{self.operator.value}{self.operand}'
+        return f'{self.operator}{self.operand}'
 
 
 class PostfixExpression(Node, TypedNode):
 
     _fields = ('operator', 'operand',)
 
-    def __init__(self, operator: Token, operand: Node, source_range: SourceRange):
+    def __init__(self, operator: Node, operand: Node, source_range: SourceRange):
         super().__init__(source_range)
         self.operator = operator
         self.operand = operand
 
     def __str__(self) -> str:
-        return f'{self.operand}{self.operator.value}'
+        return f'{self.operand}{self.operator}'
 
 
 class CallExpression(Node, TypedNode):
