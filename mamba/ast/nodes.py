@@ -344,19 +344,19 @@ class ListLiteral(Node, TypedNode):
 
 class ObjectLiteral(Node, TypedNode):
 
-    _fields = ('items',)
+    _fields = ('properties',)
 
-    def __init__(self, items: list, source_range: SourceRange):
+    def __init__(self, properties: list, source_range: SourceRange):
         super().__init__(source_range)
-        self.items = items
+        self.properties = properties
 
     def __str__(self) -> str:
         props = []
-        for key, value in self.items:
+        for key, value in self.properties:
             if isinstance(key, ScalarLiteral):
-                props.append(f'{key}: {value}')
+                props.append(f'{key} = {value}')
             else:
-                props.append((f'[ {key} ]: {value}'))
+                props.append((f'[ {key} ] = {value}'))
         return '{ ' + ', '.join(props) + ' }'
 
 

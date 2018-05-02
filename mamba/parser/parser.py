@@ -507,7 +507,7 @@ class Parser(object):
                             break
 
                     argument = ast.ObjectLiteral(
-                        items=[(key, value)],
+                        properties=[(key, value)],
                         source_range=value.source_range)
 
                 atom = ast.CallExpression(
@@ -804,13 +804,13 @@ class Parser(object):
             raise self.unexpected_token(expected='{')
 
         # Parse the items of the object.
-        items = self.parse_sequence(TokenKind.rbrace, self.parse_object_literal_item)
+        properties = self.parse_sequence(TokenKind.rbrace, self.parse_object_literal_item)
         end_token = self.consume(TokenKind.rbrace)
         if end_token is None:
             raise self.unexpected_token(expected='}')
 
         return ast.ObjectLiteral(
-            items=items,
+            properties=properties,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=end_token.source_range.end))
 
