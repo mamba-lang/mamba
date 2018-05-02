@@ -296,14 +296,8 @@ class Parser(object):
         else:
             # In the case the domain isn't parenthesized, it should be parsed as anything but a
             # function type, as the arrow operator is right associative. In other words, we don't
-            # want to parse a (non-parenthesized) function type as a function domain. Note also
-            # that we should first attempt to parse an object property (i.e. the syntactic sugar
-            # for singletons).
-            prop = self.attempt(self.parse_object_type_property)
-            if prop is not None:
-                domain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
-            else:
-                domain = self.attempt(self.parse_object_type) or self.parse_identifier
+            # want to parse a (non-parenthesized) function type as a function domain.
+            domain = self.attempt(self.parse_object_type) or self.parse_identifier()
 
         # Parse an arrow operator.
         self.consume_newlines()
@@ -318,11 +312,7 @@ class Parser(object):
             # Unlike its domain, the codomain of a function can be parsed as any other type,
             # including a function type. That said, as for domains, we should first attempt to
             # parse an object property used as a syntactic sugar.
-            prop = self.attempt(self.parse_object_type_property)
-            if prop is not None:
-                codomain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
-            else:
-                codomain = self.parse_type()
+            codomain = self.parse_type()
 
         return ast.FunctionType(
             domain=domain,
