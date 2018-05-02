@@ -364,11 +364,16 @@ class Nothing(Node):
 
     _fields = tuple()
 
-    def __init__(self, source_range: SourceRange):
-        super().__init__(source_range)
-
     def __str__(self) -> str:
         return '_'
+
+
+class ArgRef(Node, TypedNode, NamedNode):
+
+    _fields = tuple()
+
+    def __str__(self) -> str:
+        return '$'
 
 
 class ParenthesizedNode(Node):

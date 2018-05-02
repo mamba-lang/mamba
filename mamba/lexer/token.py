@@ -30,6 +30,7 @@ class TokenKind(Enum):
     rbracket        = ']'
 
     underscore      = '_'
+    argref          = '$'
     let             = 'let'
     func            = 'func'
     type            = 'type'

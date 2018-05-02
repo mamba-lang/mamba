@@ -133,6 +133,14 @@ class Lexer(object):
                     yield Token(kind=TokenKind.identifier, source_range=source_range, value=string)
                 continue
 
+            # Check for argument references.
+            if char == '$':
+                yield Token(
+                    kind=TokenKind.argref,
+                    source_range=SourceRange(start=copy(self.location)))
+                self.skip()
+                continue
+
             # Check for string literals.
             if (char == "'") or (char == '"'):
                 self.skip()

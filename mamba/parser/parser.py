@@ -462,6 +462,9 @@ class Parser(object):
         elif start_token.kind in scalar_literal_kinds:
             token = self.consume()
             atom = ast.ScalarLiteral(value=token.value, source_range=token.source_range)
+        elif start_token.kind == TokenKind.argref:
+            token = self.consume()
+            atom = ast.ArgRef(source_range=token.source_range)
         elif start_token.kind == TokenKind.identifier:
             atom = self.parse_identifier()
         elif start_token.kind == TokenKind.lbracket:
