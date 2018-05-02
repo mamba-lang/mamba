@@ -161,34 +161,15 @@ class Parser(object):
         else:
             placeholders = []
 
-        # Parse the domain of the function.
+        # Parse the type of the function.
         self.consume_newlines()
-        if self.peek().kind == TokenKind.underscore:
-            domain = ast.Nothing(source_range=self.consume().source_range)
-        else:
-            # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
-            prop = self.attempt(self.parse_object_property)
-            if prop is not None:
-                domain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
-            else:
-                domain = self.parse_annotation()
-
-        # Parse an arrow operator.
-        self.consume_newlines()
-        if self.consume(TokenKind.arrow) is None:
-            raise self.unexpected_token(expected='->')
-
-        # Parse the codomain of the function.
-        self.consume_newlines()
-        if self.peek().kind == TokenKind.underscore:
-            codomain = ast.Nothing(source_range=self.consume().source_range)
-        else:
-            # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
-            prop = self.attempt(self.parse_object_property)
-            if prop is not None:
-                codomain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
-            else:
-                codomain = self.parse_annotation()
+        function_type = self.parse_type()
+        while isinstance(function_type, ast.ParenthesizedNode):
+            function_type = function_type.node
+        if not isinstance(function_type, ast.FunctionType):
+            raise exc.ParseError(
+                source_range=function_type.source_range,
+                message=f"'{function_type}' is not a function signature")
 
         # Parse the binding operator.
         self.consume_newlines()
@@ -201,8 +182,8 @@ class Parser(object):
         return ast.FunctionDeclaration(
             name=name_token.value,
             placeholders=placeholders,
-            domain=domain,
-            codomain=codomain,
+            domain=function_type.domain,
+            codomain=function_type.codomain,
             body=body,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=body.source_range.end))
@@ -248,19 +229,23 @@ class Parser(object):
             raise self.expected_identifier()
         return name.value
 
-    def parse_annotation(self) -> ast.Node:
-        # Attempt to parse the special `_` annotation (i.e. absence thereof).
-        if self.peek().kind == TokenKind.underscore:
-            return ast.Nothing(source_range=self.consume().source_range)
-
-        return self.parse_union_type()
-
     def parse_type(self) -> ast.Node:
-        # Parse a parenthesized type.
+        # Attempt to parse a function type first, so as to properly handle parenthesis.
+        ty = self.attempt(self.parse_function_type)
+        if ty is not None:
+            return ty
+
+        # If parsing a function type failed, but the stream starts with a parenthesis, then we
+        # may recursively try to parse any parenthesized type.
         if self.peek().kind == TokenKind.lparen:
             return self.parse_parenthesized(self.parse_type)
 
-        return self.attempt(self.parse_identifier) or self.parse_object_type()
+        # Attempt to parse the alias for `Nothing`.
+        if self.peek().kind == TokenKind.underscore:
+            return ast.Nothing(source_range=self.consume().source_range)
+
+        # Attempt to parse an object type or an identifier.
+        return self.attempt(self.parse_object_type) or self.parse_identifier()
 
     def parse_union_type(self) -> ast.Node:
         # If the current token is a left parenthesis, we can't already know whether it encloses a
@@ -293,6 +278,51 @@ class Parser(object):
         else:
             return types[0]
 
+    def parse_function_type(self) -> ast.Node:
+        # Parse the domain of the function.
+        if self.peek().kind == TokenKind.lparen:
+            # If the first token is a parenthesis, we have to try parsing the domain as any
+            # parenthesized type. Note that this won't parse a function type declared with the
+            # form `(a: T) -> (a: T)`.
+            domain = self.parse_parenthesized(self.parse_type)
+        else:
+            # In the case the domain isn't parenthesized, it should be parsed as anything but a
+            # function type, as the arrow operator is right associative. In other words, we don't
+            # want to parse a (non-parenthesized) function type as a function domain. Note also
+            # that we should first attempt to parse an object property (i.e. the syntactic sugar
+            # for singletons).
+            prop = self.attempt(self.parse_object_property)
+            if prop is not None:
+                domain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
+            else:
+                domain = self.attempt(self.parse_object_type) or self.parse_identifier
+
+        # Parse an arrow operator.
+        self.consume_newlines()
+        if self.consume(TokenKind.arrow) is None:
+            raise self.unexpected_token(expected='->')
+
+        # Parse the codomain of the function.
+        self.consume_newlines()
+        if self.peek().kind == TokenKind.lparen:
+            codomain = self.parse_parenthesized(self.parse_type)
+        else:
+            # Unlike its domain, the codomain of a function can be parsed as any other type,
+            # including a function type. That said, as for domains, we should first attempt to
+            # parse an object property used as a syntactic sugar.
+            prop = self.attempt(self.parse_object_property)
+            if prop is not None:
+                codomain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
+            else:
+                codomain = self.parse_type()
+
+        return ast.FunctionType(
+            domain=domain,
+            codomain=codomain,
+            source_range=SourceRange(
+                start=domain.source_range.start, end=codomain.source_range.end))
+
+
     def parse_object_type(self) -> ast.Node:
         # Parse a left brace.
         start_token = self.consume(TokenKind.lbrace)
@@ -321,7 +351,7 @@ class Parser(object):
         backtrack = self.stream_position
         self.consume_newlines()
         if self.consume(TokenKind.colon) is not None:
-            annotation = self.parse_annotation()
+            annotation = self.parse_type()
             end = annotation.source_range.end
         else:
             self.rewind_to(backtrack)
@@ -404,7 +434,7 @@ class Parser(object):
         backtrack = self.stream_position
         self.consume_newlines()
         if self.consume(TokenKind.colon) is not None:
-            annotation = self.parse_annotation()
+            annotation = self.parse_type()
             end = annotation.source_range.end
         else:
             self.rewind_to(backtrack)
@@ -448,6 +478,9 @@ class Parser(object):
             try:
                 argument = self.attempt(self.parse_object_literal)
                 if argument is None:
+                    key = ast.ScalarLiteral(
+                        value='_0',
+                        source_range=SourceRange(start=self.peek().source_range.start))
                     value = self.parse_expression()
 
                     # Operators that can act as both an infix and a prefix or postfix operator
@@ -463,7 +496,8 @@ class Parser(object):
                             break
 
                     argument = ast.ObjectLiteral(
-                        items={ '_0': value }, source_range=value.source_range)
+                        items=[(key, value)],
+                        source_range=value.source_range)
 
                 atom = ast.CallExpression(
                     callee=atom,
@@ -537,7 +571,7 @@ class Parser(object):
             if prop is not None:
                 domain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
             else:
-                domain = self.parse_annotation()
+                domain = self.parse_type()
 
         # Parse the optional codomain.
         self.consume_newlines()
@@ -551,7 +585,7 @@ class Parser(object):
                 if prop is not None:
                     codomain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
                 else:
-                    codomain = self.parse_annotation()
+                    codomain = self.parse_type()
         else:
             codomain = None
 
@@ -685,7 +719,7 @@ class Parser(object):
             self.consume_newlines()
             sugar_backtrack = self.stream_position
             try:
-                specializers = {'_0': self.parse_annotation()}
+                specializers = {'_0': self.parse_type()}
                 self.consume_newlines()
                 end_token = self.consume(TokenKind.rbracket)
                 if end_token is None:
@@ -725,7 +759,7 @@ class Parser(object):
 
         # Parse the value of the specializer.
         self.consume_newlines()
-        value = self.parse_annotation()
+        value = self.parse_type()
         return (name_token, value)
 
     def parse_scalar_literal(self) -> ast.ScalarLiteral:
