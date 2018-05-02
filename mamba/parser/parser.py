@@ -156,7 +156,7 @@ class Parser(object):
             raise self.unexpected_token(expected='func')
 
         # Parse the name of the function.
-        name_token = self.consume(TokenKind.identifier)
+        name_token = self.consume(TokenKind.identifier) or self.consume(TokenKind.operator)
         if name_token is None:
             raise self.expected_identifier()
 
