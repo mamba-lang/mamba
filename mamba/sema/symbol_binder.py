@@ -5,12 +5,13 @@ from . import types
 from .symbol import Scope, Symbol, builtin_scope
 
 
-class SymbolBinder(ast.Visitor):
+class ScopeBuilder(ast.Visitor):
     """
-    Static analysis pass that binds all identifiers to a particular symbol.
+    Static analysis pass that build the lexical scopes of a module, and fill them with the symbols
+    that are declared within.
 
-    This steps allows to check for unbound variables, duplicate declarations, and is also required
-    to perform type inference, so as to map type aliases to their respective definition.
+    This steps allows the scope binder to then bind identifiers to their correct scope and to
+    identify unbound symbols.
     """
 
     def __init__(self):
@@ -78,6 +79,12 @@ class SymbolBinder(ast.Visitor):
         # Visit the innards of the type declaration.
         self.generic_visit(node)
         self.scopes.pop()
+
+
+class ScopeBinder(ast.Visitor):
+    """
+    Static analysis pass that binds all identifiers to a particular symbol (and scope).
+    """
 
     def visit_Identifier(self, node):
         # Look for the symbol to which bind the identifier.
