@@ -2,6 +2,7 @@ from mamba import ast
 from mamba.lexer import SourceLocation, SourceRange, Token, TokenKind
 
 from . import exc
+from .sanitizer import Sanitizer
 
 
 class Parser(object):
@@ -76,7 +77,7 @@ class Parser(object):
             self.rewind_to(backtrack)
         return None
 
-    def parse(self) -> ast.Node:
+    def parse(self, sanitized: bool = True) -> ast.Node:
         declarations = []
 
         while True:
@@ -95,7 +96,14 @@ class Parser(object):
                 start=declarations[0].source_range.start, end=declarations[-1].source_range.end)
         else:
             source_range = SourceRange(start=SourceLocation())
-        return ast.Module(declarations=declarations, source_range=source_range)
+        module = ast.Module(declarations=declarations, source_range=source_range)
+
+        # Sanitize the AST.
+        if sanitized:
+            sanitizer = Sanitizer()
+            module = sanitizer.visit(module)
+
+        return module
 
     def parse_sequence(self, delimiter: TokenKind, parse_item: callable) -> ast.Node:
         # Skip leading new lines.
