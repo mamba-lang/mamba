@@ -55,6 +55,19 @@ class Module(Node, ScopeNode):
         return '\n'.join([str(d) for d in self.declarations])
 
 
+class FunctionType(Node):
+
+    _fields = ('domain', 'codomain',)
+
+    def __init__(self, domain: Node, codomain: Node, source_range: SourceRange):
+        super().__init__(source_range)
+        self.domain = domain
+        self.codomain = codomain
+
+    def __str__(self) -> str:
+        return f'{self.domain} -> {self.codomain}'
+
+
 class ObjectType(Node):
 
     _fields = ('properties',)
