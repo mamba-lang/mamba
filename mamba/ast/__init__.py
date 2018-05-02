@@ -1,5 +1,5 @@
 from .nodes import *
-from .visitor import Visitor
+from .visitor import Transformer, Visitor
 
 __all__ = (
     Binding,
@@ -26,5 +26,6 @@ __all__ = (
     UnionType,
     WhenCase,
 
+    Transformer,
     Visitor,
 )
