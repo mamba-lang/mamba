@@ -299,7 +299,7 @@ class Parser(object):
             # want to parse a (non-parenthesized) function type as a function domain. Note also
             # that we should first attempt to parse an object property (i.e. the syntactic sugar
             # for singletons).
-            prop = self.attempt(self.parse_object_property)
+            prop = self.attempt(self.parse_object_type_property)
             if prop is not None:
                 domain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
             else:
@@ -318,7 +318,7 @@ class Parser(object):
             # Unlike its domain, the codomain of a function can be parsed as any other type,
             # including a function type. That said, as for domains, we should first attempt to
             # parse an object property used as a syntactic sugar.
-            prop = self.attempt(self.parse_object_property)
+            prop = self.attempt(self.parse_object_type_property)
             if prop is not None:
                 codomain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
             else:
@@ -338,7 +338,7 @@ class Parser(object):
             raise self.unexpected_token(expected='{')
 
         # Parse the key/value pairs of the type.
-        properties = self.parse_sequence(TokenKind.rbrace, self.parse_object_property)
+        properties = self.parse_sequence(TokenKind.rbrace, self.parse_object_type_property)
         end_token = self.consume(TokenKind.rbrace)
         if end_token is None:
             raise self.unexpected_token(expected='}')
@@ -348,7 +348,7 @@ class Parser(object):
             source_range=SourceRange(
                 start=start_token.source_range.start, end=end_token.source_range.end))
 
-    def parse_object_property(self) -> ast.Node:
+    def parse_object_type_property(self) -> ast.Node:
         # Parse the name of the property.
         name_token = self.consume()
         if (name_token is None) or (name_token.kind != TokenKind.identifier):
@@ -366,7 +366,7 @@ class Parser(object):
             annotation = None
             end = name_token.source_range.end
 
-        return ast.ObjectProperty(
+        return ast.ObjectTypeProperty(
             name=name, annotation=annotation,
             source_range=SourceRange(start=name_token.source_range.start, end=end))
 
@@ -394,7 +394,7 @@ class Parser(object):
             # attribute retrieval expression is interpreted as a character string by default.
             # Hence, we need to treat this syntactic sugar case here.
             if operator.value in { '.', '?', '!' }:
-                right = self.parse_attribute_name()
+                right = self.parse_property_key()
             else:
                 right = self.parse_atom()
 
@@ -578,7 +578,7 @@ class Parser(object):
             domain = ast.Nothing(source_range=self.consume().source_range)
         else:
             # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
-            prop = self.attempt(self.parse_object_property)
+            prop = self.attempt(self.parse_object_type_property)
             if prop is not None:
                 domain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
             else:
@@ -592,7 +592,7 @@ class Parser(object):
                 codomain = ast.Nothing(source_range=self.consume().source_range)
             else:
                 # Attempt to parse an object property (i.e. the syntactic sugar for singletons).
-                prop = self.attempt(self.parse_object_property)
+                prop = self.attempt(self.parse_object_type_property)
                 if prop is not None:
                     codomain = ast.ObjectType(properties=[prop], source_range=prop.source_range)
                 else:
@@ -804,7 +804,7 @@ class Parser(object):
             raise self.unexpected_token(expected='{')
 
         # Parse the items of the object.
-        properties = self.parse_sequence(TokenKind.rbrace, self.parse_object_literal_item)
+        properties = self.parse_sequence(TokenKind.rbrace, self.parse_object_literal_property)
         end_token = self.consume(TokenKind.rbrace)
         if end_token is None:
             raise self.unexpected_token(expected='}')
@@ -814,9 +814,9 @@ class Parser(object):
             source_range=SourceRange(
                 start=start_token.source_range.start, end=end_token.source_range.end))
 
-    def parse_object_literal_item(self) -> tuple:
+    def parse_object_literal_property(self) -> ast.ObjectLiteralProperty:
         # Parse the name of the item.
-        name = self.parse_attribute_name()
+        key = self.parse_property_key()
 
         # Parse the binding operator.
         self.consume_newlines()
@@ -825,9 +825,14 @@ class Parser(object):
 
         # Parse the value of the item.
         value = self.parse_expression()
-        return (name, value)
 
-    def parse_attribute_name(self) -> str:
+        return ast.ObjectLiteralProperty(
+            key=key,
+            value=value,
+            source_range=SourceRange(
+                start=key.source_range.start, end=value.source_range.end))
+
+    def parse_property_key(self) -> str:
         # Parse an scalar literal or an expression enclosed in brackets.
         start_token = self.peek()
 

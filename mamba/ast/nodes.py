@@ -80,19 +80,7 @@ class ObjectType(Node):
         return '{ ' + ', '.join([str(p) for p in self.properties]) + ' }'
 
 
-class UnionType(Node):
-
-    _fields = ('types',)
-
-    def __init__(self, types: list, source_range: SourceRange):
-        super().__init__(source_range)
-        self.types = types
-
-    def __str__(self) -> str:
-        return ' | '.join([str(t) for t in self.types])
-
-
-class ObjectProperty(Node):
+class ObjectTypeProperty(Node):
 
     _fields = ('name', 'annotation',)
 
@@ -105,6 +93,18 @@ class ObjectProperty(Node):
         if self.annotation:
             return f'{self.name}: {self.annotation}'
         return self.name
+
+
+class UnionType(Node):
+
+    _fields = ('types',)
+
+    def __init__(self, types: list, source_range: SourceRange):
+        super().__init__(source_range)
+        self.types = types
+
+    def __str__(self) -> str:
+        return ' | '.join([str(t) for t in self.types])
 
 
 class FunctionDeclaration(Node, NamedNode, ScopeNode):
@@ -351,13 +351,23 @@ class ObjectLiteral(Node, TypedNode):
         self.properties = properties
 
     def __str__(self) -> str:
-        props = []
-        for key, value in self.properties:
-            if isinstance(key, ScalarLiteral):
-                props.append(f'{key} = {value}')
-            else:
-                props.append((f'[ {key} ] = {value}'))
-        return '{ ' + ', '.join(props) + ' }'
+        return '{ ' + ', '.join([str(p) for p in self.properties]) + ' }'
+
+
+class ObjectLiteralProperty(Node):
+
+    _fields = ('key', 'value',)
+
+    def __init__(self, key: Node, value: Node, source_range: SourceRange):
+        super().__init__(source_range)
+        self.key = key
+        self.value = value
+
+    def __str__(self) -> str:
+        if isinstance(self.key, ScalarLiteral):
+            return f'{self.key} = {self.value}'
+        else:
+            return f'[ {self.key} ] = {self.value}'
 
 
 class Nothing(Node):

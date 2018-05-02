@@ -2,6 +2,7 @@ from .nodes import *
 from .visitor import Transformer, Visitor
 
 __all__ = (
+    ArgRef,
     Binding,
     CallExpression,
     ClosureExpression,
@@ -16,12 +17,14 @@ __all__ = (
     Node,
     Nothing,
     ObjectLiteral,
-    ObjectProperty,
     ObjectType,
+    ObjectTypeProperty,
     ParenthesizedNode,
     PostfixExpression,
     PrefixExpression,
     ScalarLiteral,
+    ObjectLiteral,
+    ObjectLiteralProperty,
     TypeDeclaration,
     UnionType,
     WhenCase,
