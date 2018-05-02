@@ -327,13 +327,13 @@ class ObjectLiteral(Node, TypedNode):
         self.items = items
 
     def __str__(self) -> str:
-        pairs = []
+        props = []
         for key, value in self.items:
             if isinstance(key, ScalarLiteral):
-                pairs.append(f'{key}: {value}')
+                props.append(f'{key}: {value}')
             else:
-                pairs.append((f'[ {key} ]: {value}'))
-        return '{ ' + ', '.join(pairs) + ' }'
+                props.append((f'[ {key} ]: {value}'))
+        return '{ ' + ', '.join(props) + ' }'
 
 
 class Nothing(Node):
