@@ -655,7 +655,9 @@ class Parser(object):
         else_ = self.parse_expression()
 
         return ast.IfExpression(
-            condition=condition, then=then, else_=else_,
+            condition=condition,
+            then=then,
+            else_=else_,
             source_range=SourceRange(
                 start=if_token.source_range.start, end=else_.source_range.end))
 
@@ -683,7 +685,8 @@ class Parser(object):
                 source_range=self.peek().source_range)
 
         return ast.MatchExpression(
-            subject=subject, cases=cases,
+            subject=subject,
+            cases=cases,
             source_range=SourceRange(
                 start=start_token.source_range.start, end=cases[-1].source_range.end))
 

@@ -32,7 +32,8 @@ class ScopeBuilder(ast.Visitor):
         symbol = self.scopes[-1].first(where=lambda s: s.name == node.name)
         if (symbol is not None) and (not symbol.overloadable):
             self.errors.append(exc.DuplicateDeclaration(
-                name=node.name, source_range=node.source_range))
+                name=node.name,
+                source_range=node.source_range))
             return
         symbol = Symbol(name=node.name, overloadable=True)
         self.scopes[-1].insert(symbol)
@@ -57,7 +58,8 @@ class ScopeBuilder(ast.Visitor):
         symbol = self.scopes[-1].first(where=lambda s: s.name == node.name)
         if symbol is not None:
             self.errors.append(exc.DuplicateDeclaration(
-                name=node.name, source_range=node.source_range))
+                name=node.name,
+                source_range=node.source_range))
             return
         symbol = Symbol(name=node.name, type=types.TypeAlias(types.TypeVariable()))
         self.scopes[-1].insert(symbol)

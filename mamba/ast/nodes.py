@@ -113,9 +113,13 @@ class FunctionDeclaration(Node, NamedNode, ScopeNode):
 
     def __init__(
         self,
-        name: str, placeholders: list, domain: Node, codomain: Node, body: Node,
-        source_range: SourceRange):
-
+        name: str,
+        placeholders: list,
+        domain: Node,
+        codomain: Node,
+        body: Node,
+        source_range: SourceRange
+    ):
         super().__init__(source_range)
         self.name = name
         self.placeholders = placeholders
