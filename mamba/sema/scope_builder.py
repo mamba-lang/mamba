@@ -30,13 +30,12 @@ class ScopeBuilder(ast.Visitor):
     def visit_FunctionDeclaration(self, node):
         # Add the name of the function to the current scope.
         symbol = self.scopes[-1].first(where=lambda s: s.name == node.name)
-        if symbol is None:
-            symbol = Symbol(name=node.name, overloadable=True)
-            self.scopes[-1].insert(symbol)
-        elif not symbol.overloadable:
+        if (symbol is not None) and (not symbol.overloadable):
             self.errors.append(exc.DuplicateDeclaration(
                 name=node.name, source_range=node.source_range))
             return
+        symbol = Symbol(name=node.name, overloadable=True)
+        self.scopes[-1].insert(symbol)
         node.symbol = symbol
 
         # Push a new scope for the function itself.
@@ -56,13 +55,12 @@ class ScopeBuilder(ast.Visitor):
     def visit_TypeDeclaration(self, node):
         # Add the name of the type to the current scope.
         symbol = self.scopes[-1].first(where=lambda s: s.name == node.name)
-        if symbol is None:
-            symbol = Symbol(name=node.name, type=types.TypeAlias(types.TypeVariable()))
-            self.scopes[-1].insert(symbol)
-        else:
+        if symbol is not None:
             self.errors.append(exc.DuplicateDeclaration(
                 name=node.name, source_range=node.source_range))
             return
+        symbol = Symbol(name=node.name, type=types.TypeAlias(types.TypeVariable()))
+        self.scopes[-1].insert(symbol)
         node.symbol = symbol
 
         # Push a new scope for the type itself.
