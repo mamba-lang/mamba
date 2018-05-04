@@ -28,8 +28,10 @@ class ConstraintSolver(object):
 
         # If there are no sub-system to solve, yield the current solution and stops the iteration.
         if not self.sub_systems:
-            # TODO: Reify the results
-            yield self.solution
+            yield {
+                var: self.deep_walk(ty)
+                for var, ty in self.solution.items()
+            }
             return
 
         # Otherwise iterate through all sub-sustems.
@@ -97,6 +99,7 @@ class ConstraintSolver(object):
         if isinstance(a, types.FunctionType) and isinstance(b, types.FunctionType):
             # Check for domain lenghts.
             if len(a.domain) != len(b.domain):
+                (a, b) = (self.deep_walk(a), self.deep_walk(b))
                 raise exc.UnificationError(a, b, 'different domain lenghts', source_range)
 
             # Unify domains and codomain.
@@ -118,10 +121,12 @@ class ConstraintSolver(object):
             else:
                 for prop_name in a:
                     if prop_name not in b:
+                        (a, b) = (self.deep_walk(a), self.deep_walk(b))
                         raise exc.UnificationError(a, b, 'incompatible types', source_range)
                     self.unify(a[prop_name], b[prop_name], source_range, memo=memo)
             return
 
+        (a, b) = (self.deep_walk(a), self.deep_walk(b))
         raise exc.UnificationError(a, b, 'incompatible types', source_range)
 
     def walk(self, ty):
@@ -130,3 +135,36 @@ class ConstraintSolver(object):
         if ty in self.solution:
             return self.walk(self.solution[ty])
         return ty
+
+    def deep_walk(self, ty, memo=None):
+        memo = memo if memo is not None else {}
+
+        if isinstance(ty, types.TypeVariable):
+            walked = self.walk(ty)
+            if not isinstance(walked, types.TypeVariable):
+                return self.deep_walk(walked, memo=memo)
+            return walked
+
+        if isinstance(ty, types.TypeAlias):
+            return types.TypeAlias(subject=self.deep_walk(ty.subject, memo=memo))
+
+        if isinstance(ty, types.FunctionType):
+            return types.FunctionType(
+                domain=self.deep_walk(ty.domain, memo=memo),
+                codomain=self.deep_walk(ty.codomain, memo=memo),
+                placeholders=ty.placeholders)
+
+        if isinstance(ty, types.ObjectType):
+            if ty in memo:
+                return memo[ty]
+            walked = types.ObjectType(placeholders=ty.placeholders)
+            memo[ty] = walked
+
+            for key, value in ty.properties.items():
+                walked.properties[key] = self.deep_walk(value, memo=memo)
+            return walked
+
+        if isinstance(ty, (types.GroundType, types.TypePlaceholder)):
+            return ty
+
+        assert False, f"unexpected type f'{type(ty)}'"
