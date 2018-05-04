@@ -34,10 +34,9 @@ class ConstraintSolver(object):
 
         # Otherwise iterate through all sub-sustems.
         while self.sub_systems:
-            for result in self.sub_systems.pop():
+            sub_system = self.sub_systems.pop()
+            for result in sub_system:
                 yield result
-                if isinstance(result, exc.SemanticError):
-                    break
 
     def solve_constraint(self, constraint):
         if constraint.kind == Constraint.Kind.equals:
