@@ -97,11 +97,6 @@ class ConstraintSolver(object):
 
         # If both types are function ...
         if isinstance(a, types.FunctionType) and isinstance(b, types.FunctionType):
-            # Check for domain lenghts.
-            if len(a.domain) != len(b.domain):
-                (a, b) = (self.deep_walk(a), self.deep_walk(b))
-                raise exc.UnificationError(a, b, 'different domain lenghts', source_range)
-
             # Unify domains and codomain.
             self.unify(a.domain, b.domain, source_range, memo=memo)
             self.unify(a.codomain, b.codomain, source_range, memo=memo)
