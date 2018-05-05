@@ -5,9 +5,6 @@ class Constraint(object):
 
     class Kind(Enum):
 
-        # A dusjunction of constraints.
-        disjunction = 0
-
         # An equality constraint.
         equals = 1
 
@@ -23,6 +20,9 @@ class Constraint(object):
         # assignment of the placeholders in T1 makes T1 conform to T2.
         specializes = 3
 
+        # A dusjunction of constraints.
+        disjunction = 4
+
     def __init__(self, kind, source_range=None, **kwargs):
         self.kind = kind
         self.kwargs = kwargs
@@ -33,6 +33,9 @@ class Constraint(object):
             return object.__getattribute__(self, attr)
         except AttributeError:
             return self.kwargs[attr]
+
+    def __lt__(self, other):
+        return self.kind.value < other.kind.value
 
     def __repr__(self):
         loc = str(self.source_range.start)

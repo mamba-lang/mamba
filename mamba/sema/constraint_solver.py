@@ -8,7 +8,7 @@ from . import types
 class ConstraintSolver(object):
 
     def __init__(self, constraints, partial_solution=None):
-        self.constraints = constraints
+        self.constraints = sorted(constraints)
         self.solution = partial_solution or {}
 
         self.done = False
