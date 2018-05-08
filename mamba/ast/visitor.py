@@ -21,6 +21,10 @@ class Visitor(object):
                 for item in value:
                     if isinstance(item, Node):
                         self.visit(item)
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if isinstance(item, Node):
+                        self.visit(item)
             elif isinstance(value, Node):
                 self.visit(value)
 
@@ -48,6 +52,19 @@ class Transformer(Visitor):
                             continue
                     new_values.append(item)
                 value[:] = new_values
+            if isinstance(value, dict):
+                new_values = {}
+                for key, item in value.items():
+                    if isinstance(item, Node):
+                        new_item = self.visit(item)
+                        if new_item is None:
+                            continue
+                        else:
+                            new_values[key] = new_item
+                            continue
+                    new_values.append(item)
+                value.clear()
+                value.update(**new_values)
             elif isinstance(value, Node):
                 new_value = self.visit(value)
                 if new_value is None:
