@@ -21,7 +21,7 @@ class ConstraintSolver(object):
         # Solve as many constraints as possible before transfering control to a sub-system.
         while self.constraints:
             try:
-                self.solve_constraint(self.constraints.pop())
+                self.solve_constraint(self.constraints.pop(0))
             except exc.SemanticError as error:
                 yield error
                 return
@@ -66,8 +66,33 @@ class ConstraintSolver(object):
         self.unify(constraint.lhs, constraint.rhs, constraint.source_range)
 
     def solve_specialization(self, constraint):
-        # FIXME
-        self.unify(constraint.lhs, constraint.rhs, constraint.source_range)
+        a = self.walk(constraint.lhs)
+        b = self.walk(constraint.rhs)
+
+        # Defer the constraint if the unspecialized type is yet unknown.
+        if isinstance(b, types.TypeVariable):
+            self.constraints.append(constraint)
+            return
+
+        # If the unspecialized type isn't generic, this boils down to an equality constraint.
+        if not getattr(b, 'placeholders', None):
+            self.solve_equality(constraint)
+            return
+
+        # Make sure no undefined specialization argument was supplied.
+        unspecified = set(constraint.args) - set(b.placeholders)
+        if unspecified:
+            raise exc.SemanticError(
+                source_range=constraint.source_range,
+                message=f'superfluous explicit specializations: {unspecified}')
+
+        # Specialize the type on the left so that it matches that on the right.
+        specialized = specialize(generic=b, pattern=a)
+        self.solve_equality(Constraint(
+            kind=Constraint.Kind.equals,
+            lhs=specialized,
+            rhs=a,
+            source_range=constraint.source_range))
 
     def unify(self, ty0, ty1, source_range, memo=None):
         """
@@ -159,7 +184,42 @@ class ConstraintSolver(object):
                 walked.properties[key] = self.deep_walk(value, memo=memo)
             return walked
 
-        if isinstance(ty, (types.GroundType, types.TypePlaceholder)):
+        if isinstance(ty, (types.GroundType, types.ListType, types.TypePlaceholder)):
             return ty
 
         assert False, f"unexpected type f'{type(ty)}'"
+
+
+class SpecializationError(Exception):
+    pass
+
+
+def specialize(generic, pattern, memo=None):
+    # Nothing to do if the generic type and the pattern are already equivalent.
+    if generic is pattern:
+        return generic
+
+    # Avoid infinite recursions.
+    memo = memo if memo is not None else {}
+    if generic in memo:
+        return memo[generic]
+
+    # If the generic type is a placeholder, use the pattern if possible.
+    if isinstance(generic, types.TypePlaceholder):
+        # Make sure the generic type is compatible with the given pattern, for every occurence of a
+        # given type placeholder.
+        if (generic in memo) and not (pattern == memo[generic]):
+            raise SpecializationError()
+        memo[generic] = pattern
+        return pattern
+
+    # If the generic type or the specialization pattern is a variable, return it.
+    if isinstance(generic, types.TypeVariable) or isinstance(pattern, types.TypeVariable):
+        return generic
+
+    if isinstance(generic, types.FunctionType) and isinstance(pattern, types.FunctionType):
+        domain = specialize(generic.domain, pattern.domain, memo=memo)
+        codomain = specialize(generic.codomain, pattern.codomain, memo=memo)
+        return types.FunctionType(domain=domain, codomain=codomain)
+
+    assert False

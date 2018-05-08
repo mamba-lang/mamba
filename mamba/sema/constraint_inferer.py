@@ -106,13 +106,14 @@ class ConstraintInferer(ast.Visitor):
 
         # Create a binary function for the operator, based on the type of the operands, which must
         # specialize the type of the operator.
-        fnTy = types.FunctionType(
+        fn_ty = types.FunctionType(
             domain=types.ObjectType(properties={'lhs': node.left.type, 'rhs': node.right.type}),
             codomain=node.type)
         self.constraints.append(Constraint(
             kind=Constraint.Kind.specializes,
             lhs=node.operator.type,
-            rhs=fnTy,
+            rhs=fn_ty,
+            args=[],
             source_range=node.source_range))
 
     def visit_CallExpression(self, node):
@@ -122,11 +123,11 @@ class ConstraintInferer(ast.Visitor):
         # Create a function type for the callee, based on the arguments of the node, which must
         # specialize the type of the callee.
         node.type = types.TypeVariable()
-        fnTy = types.FunctionType(domain=node.argument.type, codomain=node.type)
+        fn_ty = types.FunctionType(domain=node.argument.type, codomain=node.type)
         self.constraints.append(Constraint(
-            kind=Constraint.Kind.specializes,
+            kind=Constraint.Kind.equals,
             lhs=node.callee.type,
-            rhs=fnTy,
+            rhs=fn_ty,
             source_range=node.source_range))
 
     def visit_Identifier(self, node):
