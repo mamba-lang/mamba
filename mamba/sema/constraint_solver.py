@@ -1,4 +1,5 @@
 from copy import copy
+from functools import reduce
 
 from .constraint import Constraint
 from . import exc
@@ -19,7 +20,14 @@ class ConstraintSolver(object):
 
     def solutions(self):
         # Solve as many constraints as possible before transfering control to a sub-system.
+        h = None
         while self.constraints:
+            # Make sure the computation's not stuck.
+            new_h = reduce(lambda a, b: a ^ b, map(id, self.constraints))
+            if new_h == h:
+                raise exc.SemanticError('constraint system appear to be unsolvable')
+            h = new_h
+
             try:
                 self.solve_constraint(self.constraints.pop(0))
             except exc.SemanticError as error:
@@ -184,7 +192,7 @@ class ConstraintSolver(object):
                 walked.properties[key] = self.deep_walk(value, memo=memo)
             return walked
 
-        if isinstance(ty, (types.GroundType, types.ListType, types.TypePlaceholder)):
+        if isinstance(ty, types.Type):
             return ty
 
         assert False, f"unexpected type f'{type(ty)}'"
