@@ -490,9 +490,6 @@ class Parser(object):
             try:
                 argument = self.attempt(self.parse_object_literal)
                 if argument is None:
-                    key = ast.ScalarLiteral(
-                        value='_0',
-                        source_range=SourceRange(start=self.peek().source_range.start))
                     value = self.parse_expression()
 
                     # Operators that can act as both an infix and a prefix or postfix operator
@@ -507,15 +504,31 @@ class Parser(object):
                             self.rewind_to(backtrack)
                             break
 
-                    argument = ast.ObjectLiteral(
-                        properties=[(key, value)],
-                        source_range=value.source_range)
+                    # If the value is the argument reference (i.e. `$`), we use it as an object
+                    # literal so that calls of the form `f $` aren't reduced to `f { _0 = $ }`.
+                    if isinstance(value, ast.ArgRef):
+                        argument = value
+                    else:
+                        key = ast.ScalarLiteral(
+                            value='_0',
+                            source_range=SourceRange(start=self.peek().source_range.start))
+
+                        prop = ast.ObjectLiteralProperty(
+                            key=key,
+                            value=value,
+                            source_range=SourceRange(
+                                start=key.source_range.start,
+                                end=value.source_range.end))
+                        argument = ast.ObjectLiteral(
+                            properties=[prop],
+                            source_range=prop.source_range)
 
                 atom = ast.CallExpression(
                     callee=atom,
                     argument=argument,
                     source_range=SourceRange(
-                        start=atom.source_range.start, end=argument.source_range.end))
+                        start=atom.source_range.start,
+                        end=argument.source_range.end))
                 continue
 
             except:
