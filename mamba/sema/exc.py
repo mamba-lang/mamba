@@ -31,6 +31,6 @@ class UnboundName(SemanticError):
 class UnificationError(SemanticError):
 
     def __init__(self, lhs, rhs, message: str, source_range: SourceRange):
-        super().__init__(source_range, message)
+        super().__init__(source_range, message + f": '{lhs}' and '{rhs}'")
         self.lhs = lhs
         self.rhs = rhs
