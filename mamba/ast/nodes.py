@@ -297,7 +297,7 @@ class Binding(Node, TypedNode):
 
 class Identifier(Node, TypedNode, NamedNode):
 
-    _fields = ('name',)
+    _fields = ('name', 'specializers',)
 
     def __init__(self, name: str, specializers: dict, source_range: SourceRange):
         super().__init__(source_range)
@@ -319,7 +319,7 @@ class Identifier(Node, TypedNode, NamedNode):
 
 class ScalarLiteral(Node, TypedNode):
 
-    _fields = tuple()
+    _fields = ('value',)
 
     def __init__(self, value: object, source_range: SourceRange):
         super().__init__(source_range)
