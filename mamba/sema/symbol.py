@@ -57,7 +57,6 @@ builtin_scope = Scope(symbols={
     'Float' : [Symbol(name='Float' , type=types.TypeAlias(types.Float))],
     'String': [Symbol(name='String', type=types.TypeAlias(types.String))],
     'List'  : [Symbol(name='List'  , type=types.TypeAlias(types.List))],
-    'Set'   : [Symbol(name='Set'   , type=types.TypeAlias(types.Set))],
 
     # `.` is the special operator that allows access to object properties.
     '.'     : [dot_symbol],

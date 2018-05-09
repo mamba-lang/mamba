@@ -25,8 +25,24 @@ class GroundType(Type):
         self.name = name
 
     def to_string(self, memo: set) -> str:
+        return self.name
+
+
+class ListType(Type):
+
+    def __init__(self, element_type=None):
+        super().__init__()
+        self.element_type = element_type
+
+    @property
+    def placeholders(self):
+        return ['Element'] if (self.element_type is None) else None
+
+    def to_string(self, memo: set) -> str:
+        if self.element_type:
+            return f'List[ Element = {self.element_type} ]'
         else:
-            return self.name
+            return 'List'
 
 
 class TypeVariable(Type):
@@ -150,5 +166,4 @@ Bool    = GroundType('Bool')
 Int     = GroundType('Int')
 Float   = GroundType('Float')
 String  = GroundType('String')
-List    = GroundType('List', placeholders=['Element'])
-Set     = GroundType('Set', placeholders=['Element'])
+List    = ListType()
