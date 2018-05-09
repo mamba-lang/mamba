@@ -20,13 +20,14 @@ class ConstraintSolver(object):
 
     def solutions(self):
         # Solve as many constraints as possible before transfering control to a sub-system.
-        h = None
+        prevs = []
         while self.constraints:
             # Make sure the computation's not stuck.
-            new_h = reduce(lambda a, b: a ^ b, map(id, self.constraints))
-            if new_h == h:
-                raise exc.SemanticError('constraint system appear to be unsolvable')
-            h = new_h
+            if any(_list_eq(l, self.constraints) for l in prevs):
+                raise exc.SemanticError(
+                    message='constraint system appear to be unsolvable',
+                    source_range=self.constraints[0].source_range)
+            prevs = prevs[-len(self.constraints):] + [copy(self.constraints)]
 
             try:
                 self.solve_constraint(self.constraints.pop(0))
@@ -70,8 +71,28 @@ class ConstraintSolver(object):
         self.unify(constraint.lhs, constraint.rhs, constraint.source_range)
 
     def solve_conformity(self, constraint):
-        # FIXME
-        self.unify(constraint.lhs, constraint.rhs, constraint.source_range)
+        a = self.walk(constraint.lhs)
+        b = self.walk(constraint.rhs)
+
+        # Defer the constraint if the unspecialized type is yet unknown.
+        if isinstance(b, types.TypeVariable):
+            self.constraints.append(constraint)
+            return
+
+        # If the left type is still unknown, unify it with the type it should conform to. The
+        # rationale is that if there wasn't any equality constraint to better specify it, then it
+        # should at least mach the type is is supposed to conform to.
+        if isinstance(a, types.TypeVariable):
+            self.unify(constraint.lhs, constraint.rhs, constraint.source_range)
+            return
+
+        if self.check_conformance(a, b):
+            return
+        else:
+            (a, b) = (self.deep_walk(a), self.deep_walk(b))
+            raise exc.UnificationError(a, b, 'incompatible types', constraint.source_range)
+
+        assert False
 
     def solve_specialization(self, constraint):
         a = self.walk(constraint.lhs)
@@ -157,6 +178,42 @@ class ConstraintSolver(object):
         (a, b) = (self.deep_walk(a), self.deep_walk(b))
         raise exc.UnificationError(a, b, 'incompatible types', source_range)
 
+    def check_conformance(self, ty0, ty1, memo=None):
+        """
+        Check whether or not `ty0` conforms to `ty1`
+        """
+        memo = memo if memo is not None else {}
+
+        a = self.walk(ty0)
+        b = self.walk(ty1)
+
+        # If both types are equal, conformity succeeds.
+        if a is b:
+            return True
+
+        # If the right type is `Object`, conformity always succeeds.
+        if isinstance(b, types.ObjectType) and not b.properties:
+            return True
+
+        # If both types are object types ...
+        if isinstance(a, types.ObjectType) and isinstance(b, types.ObjectType):
+            # Take into account the possible use of the syntactic sugar that consists of omitting
+            # property labels when there's only one.
+            if (
+                (len(a) == 1) and ('_0' in a.properties) or
+                (len(b) == 1) and ('_0' in b.properties)
+            ):
+                _, lhs = next(iter(a.properties.items()))
+                _, rhs = next(iter(b.properties.items()))
+                return self.check_conformance(lhs, rhs, memo=memo)
+            else:
+                for prop_name in a:
+                    if prop_name not in b:
+                        return False
+                    return self.check_conformance(a[prop_name], b[prop_name], memo=memo)
+
+        assert False, 'TODO'
+
     def walk(self, ty):
         if not isinstance(ty, types.TypeVariable):
             return ty
@@ -198,36 +255,11 @@ class ConstraintSolver(object):
         assert False, f"unexpected type f'{type(ty)}'"
 
 
-class SpecializationError(Exception):
-    pass
-
-
-def specialize(generic, pattern, memo=None):
-    # Nothing to do if the generic type and the pattern are already equivalent.
-    if generic is pattern:
-        return generic
-
-    # Avoid infinite recursions.
-    memo = memo if memo is not None else {}
-    if generic in memo:
-        return memo[generic]
-
-    # If the generic type is a placeholder, use the pattern if possible.
-    if isinstance(generic, types.TypePlaceholder):
-        # Make sure the generic type is compatible with the given pattern, for every occurence of a
-        # given type placeholder.
-        if (generic in memo) and not (pattern == memo[generic]):
-            raise SpecializationError()
-        memo[generic] = pattern
-        return pattern
-
-    # If the generic type or the specialization pattern is a variable, return it.
-    if isinstance(generic, types.TypeVariable) or isinstance(pattern, types.TypeVariable):
-        return generic
-
-    if isinstance(generic, types.FunctionType) and isinstance(pattern, types.FunctionType):
-        domain = specialize(generic.domain, pattern.domain, memo=memo)
-        codomain = specialize(generic.codomain, pattern.codomain, memo=memo)
-        return types.FunctionType(domain=domain, codomain=codomain)
-
-    assert False
+def _list_eq(lhs: list, rhs: list, eq: callable = None) -> bool:
+    if len(lhs) != len(rhs):
+        return False
+    eq = eq or (lambda a, b: a is b)
+    for i in range(len(lhs)):
+        if not eq(lhs[i], rhs[i]):
+            return False
+    return True

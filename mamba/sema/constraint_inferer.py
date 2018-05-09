@@ -119,15 +119,29 @@ class ConstraintInferer(ast.Visitor):
     def visit_CallExpression(self, node):
         self.visit(node.callee)
         self.visit(node.argument)
-
-        # Create a function type for the callee, based on the arguments of the node, which must
-        # specialize the type of the callee.
         node.type = types.TypeVariable()
-        fn_ty = types.FunctionType(domain=node.argument.type, codomain=node.type)
+
+        # Create a function type for the callee.
+        arg_ty = types.TypeVariable()
+        ret_ty = types.TypeVariable()
+        fun_ty = types.FunctionType(domain=arg_ty, codomain=ret_ty)
         self.constraints.append(Constraint(
             kind=Constraint.Kind.equals,
             lhs=node.callee.type,
-            rhs=fn_ty,
+            rhs=fun_ty,
+            source_range=node.source_range))
+
+        # The argument of the call must conform to the function's domain, and the node itself must
+        # conform to the function's codomain.
+        self.constraints.append(Constraint(
+            kind=Constraint.Kind.conforms,
+            lhs=node.argument.type,
+            rhs=arg_ty,
+            source_range=node.source_range))
+        self.constraints.append(Constraint(
+            kind=Constraint.Kind.conforms,
+            lhs=node.type,
+            rhs=ret_ty,
             source_range=node.source_range))
 
     def visit_Identifier(self, node):
