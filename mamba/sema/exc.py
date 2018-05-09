@@ -34,3 +34,7 @@ class UnificationError(SemanticError):
         super().__init__(source_range, message + f": '{lhs}' and '{rhs}'")
         self.lhs = lhs
         self.rhs = rhs
+
+
+class SpecializationError(Exception):
+    pass

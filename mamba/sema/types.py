@@ -1,3 +1,6 @@
+from .exc import SpecializationError
+
+
 class Type(object):
 
     def to_string(self, memo: set) -> str:
@@ -104,6 +107,33 @@ class FunctionType(Type):
         else:
             placeholders = ''
         return placeholders + f'{self.domain.to_string(memo)} -> {self.codomain.to_string(memo)}'
+
+
+def specialize(generic, pattern, memo=None):
+    # Avoid infinite recursions.
+    memo = memo if memo is not None else {}
+    if generic in memo:
+        return memo[generic]
+
+    # If the generic type is a placeholder, use the pattern if possible.
+    if isinstance(generic, TypePlaceholder):
+        # Make sure the generic type is compatible with the given pattern, for every occurence of a
+        # given type placeholder.
+        if (generic in memo) and not (pattern == memo[generic]):
+            raise SpecializationError()
+        memo[generic] = pattern
+        return pattern
+
+    # If the generic type or the specialization pattern is a variable, return it.
+    if isinstance(generic, TypeVariable) or isinstance(pattern, TypeVariable):
+        return generic
+
+    if isinstance(generic, FunctionType) and isinstance(pattern, FunctionType):
+        domain = specialize(generic.domain, pattern.domain, memo=memo)
+        codomain = specialize(generic.codomain, pattern.codomain, memo=memo)
+        return FunctionType(domain=domain, codomain=codomain)
+
+    assert False
 
 
 Nothing = GroundType('Nothing')

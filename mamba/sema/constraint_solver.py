@@ -95,7 +95,7 @@ class ConstraintSolver(object):
                 message=f'superfluous explicit specializations: {unspecified}')
 
         # Specialize the type on the left so that it matches that on the right.
-        specialized = specialize(generic=b, pattern=a)
+        specialized = types.specialize(generic=b, pattern=a)
         self.solve_equality(Constraint(
             kind=Constraint.Kind.equals,
             lhs=specialized,
