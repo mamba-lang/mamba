@@ -46,7 +46,7 @@ class Scope(object):
 #     ∀a ∈ Σ*, . [T] { lhs: { a: T }, rhs: String } -> T
 #
 # where Σ is the alphabet of character allowed in a string.
-dot_symbol = Symbol(name='.', type=types.Type())
+dot_symbol = Symbol(name='.', type=types.Type(description='[built-in dot operator]'))
 
 
 builtin_scope = Scope(symbols={

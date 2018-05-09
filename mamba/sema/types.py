@@ -3,10 +3,15 @@ from .exc import SpecializationError
 
 class Type(object):
 
+    def __init__(self, description=None):
+        self._description = description
+
     def to_string(self, memo: set) -> str:
         return f'<Type at {hex(id(self))}>'
 
     def __str__(self) -> str:
+        if self._description is not None:
+            return self._description
         return self.to_string(set())
 
     def __repr__(self) -> str:
@@ -15,13 +20,11 @@ class Type(object):
 
 class GroundType(Type):
 
-    def __init__(self, name: str, placeholders=None):
+    def __init__(self, name: str):
+        super().__init__()
         self.name = name
-        self.placeholders = placeholders or []
 
     def to_string(self, memo: set) -> str:
-        if self.placeholders:
-            return '[ ' + ', '.join(self.placeholders) + ' ]' + self.name
         else:
             return self.name
 
@@ -31,6 +34,7 @@ class TypeVariable(Type):
     next_id = 0
 
     def __init__(self):
+        super().__init__()
         self.id = TypeVariable.next_id
         TypeVariable.next_id += 1
 
@@ -41,6 +45,7 @@ class TypeVariable(Type):
 class TypeAlias(object):
 
     def __init__(self, subject):
+        super().__init__()
         self.subject = subject
 
     def to_string(self, memo: set) -> str:
@@ -50,6 +55,7 @@ class TypeAlias(object):
 class TypePlaceholder(Type):
 
     def __init__(self, name: str):
+        super().__init__()
         self.name = name
 
     def to_string(self, memo: set) -> str:
@@ -59,6 +65,7 @@ class TypePlaceholder(Type):
 class ObjectType(Type):
 
     def __init__(self, properties=None, placeholders=None):
+        super().__init__()
         self.properties = properties or {}
         self.placeholders = placeholders or []
 
@@ -88,15 +95,17 @@ class ObjectType(Type):
 class UnionType(Type):
 
     def __init__(self, types):
+        super().__init__()
         self.types = types
 
     def to_string(self, memo: set) -> str:
-        return ' | '.join([t.to_string(memo) for t in self.types])
+        return ' | '.join(str(t) for t in self.types)
 
 
 class FunctionType(Type):
 
     def __init__(self, domain, codomain, placeholders=None):
+        super().__init__()
         self.domain = domain
         self.codomain = codomain
         self.placeholders = placeholders
@@ -106,7 +115,7 @@ class FunctionType(Type):
             placeholders = '[ ' + ', '.join(self.placeholders) + ' ]'
         else:
             placeholders = ''
-        return placeholders + f'{self.domain.to_string(memo)} -> {self.codomain.to_string(memo)}'
+        return placeholders + f'{self.domain} -> {self.codomain}'
 
 
 def specialize(generic, pattern, memo=None):
