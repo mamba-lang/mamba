@@ -226,10 +226,30 @@ def create_type(node):
         # type alias, or a type placeholder.
         if isinstance(symbol.type, types.TypeAlias):
             node.type = symbol.type.subject
-            return node.type
-        if isinstance(symbol.type, types.TypePlaceholder):
+        elif isinstance(symbol.type, types.TypePlaceholder):
             node.type = symbol.type
-            return node.type
+        else:
+            raise exc.SemanticError(
+                message=f"'{node}' must be a type alias or a type placholder",
+                source_range=node.source_range)
+
+        # Handle specialization arguments.
+        if node.specializers:
+            names = set(node.specializers)
+            if names == { '_0' }:
+                names = { getattr(node.type, 'placeholders', ['_0'])[0] }
+            unspecified = names - set(getattr(node.type, 'placeholders', []))
+            if unspecified:
+                raise exc.SemanticError(
+                    message=f'superfluous explicit specializations: {unspecified}',
+                    source_range=node.source_range)
+
+            # FIXME
+            assert isinstance(node.type, types.ListType), 'TODO'
+            specs = { key: create_type(node) for key, node in node.specializers.items() }
+            node.type.element_type = specs.get('Element', specs['_0'])
+
+        return node.type
 
     if isinstance(node, ast.Nothing):
         return types.Nothing
