@@ -12,30 +12,27 @@ class ConstraintInferer(ast.Visitor):
     def __init__(self):
         self.errors = []
         self.constraints = []
+        self.signature_visitor = _SignatureConstraintInferer()
 
     def visit_TypeDeclaration(self, node):
-        # Skip this node if its symbol wasn't been created due to a problem during symbol binding.
-        if node.symbol is None:
-            return
+        # The type of the node's symbol should be an alias, created during the scope building pass.
         assert isinstance(node.symbol.type, types.TypeAlias)
 
         # Create the declared type.
-        node.type = create_type(node.body)
-        if node.placeholders:
-            if isinstance(node.type, types.UnionType):
-                for ty in node.type:
-                    ty.placeholders = node.placeholders
-            else:
-                node.type.placeholders = node.placeholders
+        try:
+            self.signature_visitor.visit(node.body)
+        except exc.SemanticError as e:
+            self.errors.append(e)
+            return
+
+        # If the node has generic placeholders, add them to the created type.
+        # FIXME (node.placeholders)
 
         self.constraints.append(Constraint(
             kind=Constraint.Kind.equals,
             lhs=node.symbol.type.subject,
-            rhs=node.type,
+            rhs=node.body.type,
             source_range=node.source_range))
-
-        # Note that we do not recursively visit the body of a type declaration, as it has already
-        # been processed by `create_type`.
 
     def visit_FunctionDeclaration(self, node):
         # Skip this node if its symbol wasn't been created due to a problem during symbol binding.
@@ -43,12 +40,13 @@ class ConstraintInferer(ast.Visitor):
             return
 
         # Create the type of the declared function.
-        domain = create_type(node.domain)
-        codomain = create_type(node.codomain)
-        node.type = types.FunctionType(domain, codomain, node.placeholders)
-
-        # Note that we do not recursively visit the domain/codomain of a function declaration, as
-        # they already have been processed by `create_type`.
+        try:
+            self.signature_visitor.visit(node.domain)
+            self.signature_visitor.visit(node.codomain)
+        except exc.SemanticError as e:
+            self.errors.append(e)
+            return
+        node.type = types.FunctionType(node.domain.type, node.codomain.type, node.placeholders)
 
         # Create an equality constraint for the function's symbol.
         self.constraints.append(Constraint(
@@ -62,7 +60,7 @@ class ConstraintInferer(ast.Visitor):
         self.constraints.append(Constraint(
             kind=Constraint.Kind.equals,
             lhs=argref_symbol.type,
-            rhs=domain,
+            rhs=node.domain.type,
             source_range=node.source_range))
 
         self.visit(node.body)
@@ -72,7 +70,7 @@ class ConstraintInferer(ast.Visitor):
         self.constraints.append(Constraint(
             kind=Constraint.Kind.conforms,
             lhs=node.body.type,
-            rhs=codomain,
+            rhs=node.codomain.type,
             source_range=node.body.source_range))
 
     def visit_InfixExpression(self, node):
@@ -86,14 +84,15 @@ class ConstraintInferer(ast.Visitor):
         # as a special case.
         symbols = node.operator.scope[node.operator.name]
         if dot_symbol in symbols:
-            # The type of the left operand must conform to `{ right: T }`, where `right` is the
-            # value of the right operand.
+            # An object `{ right: T }` with `right` the value of the right operand must conform to
+            # the type of the left operand. For instance, `{ name = "Pikachu", level = 0 } . level`
+            # implies `{ level: Int } ⊂ { name: String, level: Int }`.
             assert isinstance(node.right, ast.ScalarLiteral)
-            objTy = types.ObjectType(properties={node.right.value: node.type})
+            obj_ty = types.ObjectType(properties={node.right.value: node.type})
             self.constraints.append(Constraint(
                 kind=Constraint.Kind.conforms,
-                lhs=node.left.type,
-                rhs=objTy,
+                lhs=obj_ty,
+                rhs=node.left.type,
                 source_range=node.source_range))
 
             # FIXME: We also should consider the alternative where the right operand is a function
@@ -132,14 +131,14 @@ class ConstraintInferer(ast.Visitor):
             source_range=node.source_range))
 
         # The argument of the call must conform to the function's domain, and the node itself must
-        # conform to the function's codomain.
+        # be equal to the function's codomain.
         self.constraints.append(Constraint(
             kind=Constraint.Kind.conforms,
             lhs=node.argument.type,
             rhs=arg_ty,
             source_range=node.source_range))
         self.constraints.append(Constraint(
-            kind=Constraint.Kind.conforms,
+            kind=Constraint.Kind.equals,
             lhs=node.type,
             rhs=ret_ty,
             source_range=node.source_range))
@@ -154,20 +153,22 @@ class ConstraintInferer(ast.Visitor):
 
         # Get all symbols the identifier might be eventually bound to.
         symbols = node.scope[node.name]
-        # Process the generic specializers (if any).
-        args = { name: create_type(ty) for name, ty in (node.specializers or {}) }
 
-        # Note that we do not recursively visit the specializers of an identifier declaration, as
-        # they already have been processed by `create_type`.
+        # Build the type of the specialization arguments (if any).
+        specialization_arguments = {}
+        if node.specializers:
+            for key, child in node.specializers.items():
+                self.signature_visitor.visit(child)
+                specialization_arguments[key] = child.type
 
-        # Create equality and specialization constraints.
+        # Create specialization constraints.
         node.type = types.TypeVariable()
         constraints = [
             Constraint(
                 kind=Constraint.Kind.specializes,
                 lhs=node.type,
                 rhs=symbol.type,
-                args=args,
+                args=specialization_arguments,
                 source_range=node.source_range)
             for symbol in symbols
         ]
@@ -207,65 +208,82 @@ class ConstraintInferer(ast.Visitor):
         node.type = types.ObjectType(properties=props)
 
 
-def create_type(node):
-    if isinstance(node, ast.UnionType):
-        return types.UnionType([create_type(t) for t in node.types])
+class _SignatureConstraintInferer(ast.Visitor):
+    """
+    Visitor that extracts typing constraints for type signatures.
 
-    if isinstance(node, ast.ObjectType):
+    Type signatures must be visited differently than expressions, in particular with respect to
+    identifiers.
+    """
+
+    def visit_UnionType(self, node):
+        self.generic_visit(node)
+        node.type = types.UnionType([child.type for child in node.types])
+
+    def visit_ObjectType(self, node):
+        # Process the object's properties.
         properties = {}
         for prop in node.properties:
+            # Make sure the same property doesn't appear twice in the object type.
             assert isinstance(prop, ast.ObjectTypeProperty)
             if prop.name in properties:
                 raise exc.DuplicateDeclaration(name=prop.name, source_range=prop.source_range)
-            elif prop.annotation is None:
+
+            # Create the property's type if it has an annotation.
+            if prop.annotation is None:
                 properties[prop.name] = types.TypeVariable()
             else:
-                properties[prop.name] = create_type(prop.annotation)
+                self.visit(prop.annotation)
+                properties[prop.name] = prop.annotation.type
 
-        return types.ObjectType(properties=properties)
+        # Create the object type.
+        node.type = types.ObjectType(properties=properties)
 
-    if isinstance(node, ast.Identifier):
-        # Make sure the symbol is bound and not overloaded.
-        if node.scope is None:
+    def visit_Identifier(self, node):
+        # Make sure the symbol is bound.
+        if (node.scope is None) or not node.scope[node.name]:
             raise exc.UnboundName(name=node.name, source_range=node.source_range)
+
+        # The symbol should not be overloaded, as function names can't be used as type signatures.
         symbols = node.scope[node.name]
-        if not symbols:
-            raise exc.UnboundName(name=node.name, source_range=node.source_range)
         if len(symbols) > 1:
             raise exc.SemanticError(
-                message=f"'{node.name}' is overloaded", source_range=node.source_range)
+                message=f"'{node.name}' is not a type",
+                source_range=node.source_range)
         symbol = symbols[0]
 
-        # Since we don't allow dynamic typing, the symbol of an type identifier should be either a
-        # type alias, or a type placeholder.
+        # Since we don't allow dynamic typing, the symbol of an type identifier should be either an
+        # alias or a placeholder, created during the scope building pass.
         if isinstance(symbol.type, types.TypeAlias):
             node.type = symbol.type.subject
         elif isinstance(symbol.type, types.TypePlaceholder):
             node.type = symbol.type
         else:
             raise exc.SemanticError(
-                message=f"'{node}' must be a type alias or a type placholder",
+                message=f"'{node.name}' is not a type",
                 source_range=node.source_range)
 
         # Handle specialization arguments.
         if node.specializers:
+            # Take into account the possible use of the syntactic sugar that consists of omitting
+            # the name of the placeholder when there's only one (e.g. `List[Int]`).
             names = set(node.specializers)
-            if names == { '_0' }:
-                names = { getattr(node.type, 'placeholders', ['_0'])[0] }
-            unspecified = names - set(getattr(node.type, 'placeholders', []))
-            if unspecified:
-                raise exc.SemanticError(
-                    message=f'superfluous explicit specializations: {unspecified}',
-                    source_range=node.source_range)
+            if names != { '_0' }:
+                # Check for extraneous arguments.
+                extraneous = names - set(getattr(node.type, 'placeholders', []))
+                if extraneous:
+                    raise exc.SemanticError(
+                        message=f'extraneous explicit specializations: {extraneous}',
+                        source_range=node.source_range)
 
-            # FIXME
-            assert isinstance(node.type, types.ListType), 'TODO'
-            specs = { key: create_type(node) for key, node in node.specializers.items() }
-            node.type.element_type = specs.get('Element', specs['_0'])
+            # Build the type of the specialization arguments.
+            specialization_arguments = {}
+            for key, child in node.specializers.items():
+                self.visit(child)
+                specialization_arguments[key] = child.type
 
-        return node.type
+            # Apply the specialization arguments.
+            node.type = node.type.specialized(args=specialization_arguments)
 
-    if isinstance(node, ast.Nothing):
-        return types.Nothing
-
-    raise exc.SemanticError(message=f"'{node}' is not a type", source_range=node.source_range)
+    def visit_Nothing(self, node):
+        node.type = types.Nothing

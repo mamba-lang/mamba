@@ -6,6 +6,9 @@ class Type(object):
     def __init__(self, description=None):
         self._description = description
 
+    def specialized(self, args: dict):
+        return SpecializedType(type=self, args=args)
+
     def to_string(self, memo: set) -> str:
         return f'<Type at {hex(id(self))}>'
 
@@ -16,6 +19,18 @@ class Type(object):
 
     def __repr__(self) -> str:
         return str(self)
+
+
+class SpecializedType(Type):
+
+    def __init__(self, type: Type, args: dict):
+        super().__init__()
+        self.type = type
+        self.args = args
+
+    def to_string(self, memo: set) -> str:
+        args = ', '.join(f'{key} = {type}' for key, type in self.args.items())
+        return '[ ' + args + ' ]' + self.type.to_string(memo)
 
 
 class GroundType(Type):
@@ -37,6 +52,12 @@ class ListType(Type):
     @property
     def placeholders(self):
         return ['Element'] if (self.element_type is None) else None
+
+    def specialized(self, args: dict):
+        if set(args.keys()) == { '_0' }:
+            return ListType(element_type=args['_0'])
+        else:
+            return ListType(element_type=args['Element'])
 
     def to_string(self, memo: set) -> str:
         if self.element_type:

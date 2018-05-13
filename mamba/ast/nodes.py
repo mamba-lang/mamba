@@ -68,7 +68,7 @@ class FunctionType(Node):
         return f'{self.domain} -> {self.codomain}'
 
 
-class ObjectType(Node):
+class ObjectType(Node, TypedNode):
 
     _fields = ('properties',)
 
@@ -374,7 +374,7 @@ class ObjectLiteralProperty(Node):
             return f'[ {self.key} ] = {self.value}'
 
 
-class Nothing(Node):
+class Nothing(Node, TypedNode):
 
     _fields = tuple()
 
