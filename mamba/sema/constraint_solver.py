@@ -1,5 +1,4 @@
 from copy import copy
-from functools import reduce
 
 from .constraint import Constraint
 from . import exc
@@ -86,13 +85,8 @@ class ConstraintSolver(object):
             self.unify(constraint.lhs, constraint.rhs, constraint.source_range)
             return
 
-        if self.check_conformance(a, b):
-            return
-        else:
-            (a, b) = (self.deep_walk(a), self.deep_walk(b))
-            raise exc.UnificationError(a, b, 'incompatible types', constraint.source_range)
-
-        assert False
+        # Otherwise, make sure it conforms to the right type, unifying free types along the way.
+        self.check_conformance(a, b, constraint.source_range)
 
     def solve_specialization(self, constraint):
         a = self.walk(constraint.lhs)
@@ -178,22 +172,16 @@ class ConstraintSolver(object):
         (a, b) = (self.deep_walk(a), self.deep_walk(b))
         raise exc.UnificationError(a, b, 'incompatible types', source_range)
 
-    def check_conformance(self, ty0, ty1, memo=None):
-        """
-        Check whether or not `ty0` conforms to `ty1`
-        """
+    def check_conformance(self, ty0, ty1, source_range, memo=None):
+        """Checks whether or not `ty0` conforms to `ty1`."""
         memo = memo if memo is not None else {}
 
         a = self.walk(ty0)
         b = self.walk(ty1)
 
-        # If both types are equal, conformity succeeds.
-        if a is b:
-            return True
-
-        # If the right type is `Object`, conformity always succeeds.
-        if isinstance(b, types.ObjectType) and not b.properties:
-            return True
+        # If both types are equal, or if the right type is `Object` conformity always succeeds.
+        if (a is b) or (isinstance(b, types.ObjectType) and not b.properties):
+            return
 
         # If both types are object types ...
         if isinstance(a, types.ObjectType) and isinstance(b, types.ObjectType):
@@ -205,14 +193,25 @@ class ConstraintSolver(object):
             ):
                 _, lhs = next(iter(a.properties.items()))
                 _, rhs = next(iter(b.properties.items()))
-                return self.check_conformance(lhs, rhs, memo=memo)
+                self.check_conformance(lhs, rhs, source_range, memo=memo)
             else:
                 for prop_name in a:
                     if prop_name not in b:
-                        return False
-                    return self.check_conformance(a[prop_name], b[prop_name], memo=memo)
+                        raise exc.UnificationError(
+                            a, b,
+                            f"type '{b}' does not have a property '{prop_name}'",
+                            source_range)
+                    self.check_conformance(a[prop_name], b[prop_name], source_range, memo=memo)
+            return
 
-        assert False, 'TODO'
+        # If the left type is a variable, we treat the conformance constraint as an equality
+        # constraint. The rationale is that there shouldn't be other constraint that more loosely
+        # describe the same type, as equality constraints are processed first.
+        if isinstance(a, types.TypeVariable):
+            self.unify(a, b, source_range)
+            return
+
+        assert False, f"unimplemented conformance checking between '{type(a)}' and '{type(b)}'"
 
     def walk(self, ty):
         if not isinstance(ty, types.TypeVariable):

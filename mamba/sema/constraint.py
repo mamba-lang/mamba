@@ -8,17 +8,17 @@ class Constraint(object):
         # An equality constraint.
         equals = 1
 
-        # A conformance constraint.
-        #
-        # Conformance is a weaker equivalence between two object types T1 T2 stating that T1
-        # conforms to T2 if all fields in T2 are contained in T1.
-        conforms = 2
-
         # A specialization constraint.
         #
         # Specialization is an equivalence between two types T1 T2, holding if a particular
         # assignment of the placeholders in T1 makes T1 conform to T2.
-        specializes = 3
+        specializes = 2
+
+        # A conformance constraint.
+        #
+        # Conformance is a weaker equivalence between two object types T1 T2 stating that T1
+        # conforms to T2 if all fields in T2 are contained in T1.
+        conforms = 3
 
         # A dusjunction of constraints.
         disjunction = 4
