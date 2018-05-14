@@ -25,8 +25,8 @@ class ConstraintInferer(ast.Visitor):
             self.errors.append(e)
             return
 
-        # If the node has generic placeholders, add them to the created type.
-        # FIXME (node.placeholders)
+        # FIXME If the node has generic placeholders, add them to the created type.
+        # See how placeholders are handled in function declarations.
 
         self.constraints.append(Constraint(
             kind=Constraint.Kind.equals,
@@ -35,18 +35,25 @@ class ConstraintInferer(ast.Visitor):
             source_range=node.source_range))
 
     def visit_FunctionDeclaration(self, node):
-        # Skip this node if its symbol wasn't been created due to a problem during symbol binding.
-        if node.symbol is None:
-            return
+        assert node.symbol is not None
 
-        # Create the type of the declared function.
+        # Read the signature of the function.
         try:
             self.signature_visitor.visit(node.domain)
             self.signature_visitor.visit(node.codomain)
         except exc.SemanticError as e:
             self.errors.append(e)
             return
-        node.type = types.FunctionType(node.domain.type, node.codomain.type, node.placeholders)
+
+        # The placeholder of the funtion should be in its inner scope.
+        placeholders = []
+        for name in node.placeholders:
+            symbols = node.inner_scope[name]
+            assert len(symbols) == 1
+            placeholders.append(symbols[0].type)
+
+        # Create the type of the declared function.
+        node.type = types.FunctionType(node.domain.type, node.codomain.type, placeholders)
 
         # Create an equality constraint for the function's symbol.
         self.constraints.append(Constraint(
@@ -54,6 +61,10 @@ class ConstraintInferer(ast.Visitor):
             lhs=node.symbol.type,
             rhs=node.type,
             source_range=node.source_range))
+
+        # If the function is generic, hold the inference of its body until the instanciation pass.
+        if len(node.placeholders) > 0:
+            return
 
         # Create an equality constraint for the function's arugment reference.
         argref_symbol = node.inner_scope['$'][0]
@@ -235,6 +246,8 @@ class _SignatureConstraintInferer(ast.Visitor):
             else:
                 self.visit(prop.annotation)
                 properties[prop.name] = prop.annotation.type
+
+        # FIXME: Process the object's placeholders.
 
         # Create the object type.
         node.type = types.ObjectType(properties=properties)

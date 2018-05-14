@@ -39,14 +39,35 @@ class Scope(object):
         return self.symbols.get(name)
 
 
-# Note: `.` is a special function that allows access to object properties. It's signature can't be
+# `.` is a special function that allows access to object properties. It's signature can't be
 # formally expressed within Mamba's type system, as it would depend on the name of the requested
 # property. In fact, the set of overloads of `.` is an infinite set of signatures, described as:
 #
 #     ∀a ∈ Σ*, . [T] { lhs: { a: T }, rhs: String } -> T
 #
 # where Σ is the alphabet of character allowed in a string.
-dot_symbol = Symbol(name='.', type=types.Type(description='[built-in dot operator]'))
+dot_symbol = Symbol(
+    name='.',
+    overloadable=True,
+    type=types.Type(description='[built-in dot operator]'))
+
+# `!` is a special function that allows unchecked access to object properties. Just as `.`, its
+# signature can't be formally expressed withing Mamba's type system in general, hence the use of a
+# built-in type.
+exclamation_symbol = Symbol(
+    name='!',
+    overloadable=True,
+    type=types.Type(description='[built-in exclamation operator]'))
+
+# However, if the left operand is a list, and the right operand an integer (i.e. a list index),
+# then the type of the result might be inferred, which is why the symbol is overloaded.
+getitem_symbol = Symbol(
+    name='!',
+    overloadable=True,
+    type=types.FunctionType(
+        domain       = types.ObjectType({ 'lhs': types.List, 'rhs': types.Int }),
+        codomain     = types.List.placeholders[0],
+        placeholders = types.List.placeholders))
 
 
 builtin_scope = Scope(symbols={
@@ -61,20 +82,32 @@ builtin_scope = Scope(symbols={
     # `.` is the special operator that allows access to object properties.
     '.'     : [dot_symbol],
 
+    # `!` is the special operator that allows unchecked access to object properties.
+    '!'     : [exclamation_symbol, getitem_symbol],
+
     # Arithmetic operators.
     '+'     : [
-        Symbol(name='+', type=types.FunctionType(
-            domain   = types.ObjectType({ 'lhs': types.Int, 'rhs': types.Int }),
-            codomain = types.Int)),
-        Symbol(name='+', type=types.FunctionType(
-            domain   = types.ObjectType({ 'lhs': types.Float, 'rhs': types.Float }),
-            codomain = types.Float)),
+        Symbol(
+            name='+',
+            overloadable=True,
+            type=types.FunctionType(
+                domain   = types.ObjectType({ 'lhs': types.Int, 'rhs': types.Int }),
+                codomain = types.Int)),
+        Symbol(
+            name='+',
+            overloadable=True,
+            type=types.FunctionType(
+                domain   = types.ObjectType({ 'lhs': types.Float, 'rhs': types.Float }),
+                codomain = types.Float)),
     ],
 
     # The `print` function.
     'print' : [
-        Symbol(name='print', type=types.FunctionType(
-            domain   = types.ObjectType({ 'item': types.ObjectType() }),
-            codomain = types.Nothing)),
+        Symbol(
+            name='print',
+            overloadable=True,
+            type=types.FunctionType(
+                domain   = types.ObjectType({ 'item': types.ObjectType() }),
+                codomain = types.Nothing)),
     ],
 })

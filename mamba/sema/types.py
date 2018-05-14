@@ -1,6 +1,3 @@
-from .exc import SpecializationError
-
-
 class Type(object):
 
     def __init__(self, description=None):
@@ -8,6 +5,9 @@ class Type(object):
 
     def specialized(self, args: dict):
         return SpecializedType(type=self, args=args)
+
+    def equals(self, other, memo: dict = None) -> bool:
+        return self is other
 
     def to_string(self, memo: set) -> str:
         return f'<Type at {hex(id(self))}>'
@@ -47,11 +47,19 @@ class ListType(Type):
 
     def __init__(self, element_type=None):
         super().__init__()
-        self.element_type = element_type
+        self.placeholder = TypePlaceholder(name='Element')
+        self.element_type = element_type or self.placeholder
 
     @property
     def placeholders(self):
-        return ['Element'] if (self.element_type is None) else None
+        return [self.placeholder] if (self.element_type is self.placeholder) else None
+
+    def equals(self, other, memo: dict = None) -> bool:
+        if not isinstance(other, ListType):
+            return False
+        if self.element_type is None:
+            return other.element_type is None
+        return self.element_type.equals(other.element_type, memo=memo)
 
     def specialized(self, args: dict):
         if set(args.keys()) == { '_0' }:
@@ -85,6 +93,11 @@ class TypeAlias(object):
         super().__init__()
         self.subject = subject
 
+    def equals(self, other, memo: dict = None) -> bool:
+        if not isinstance(other, TypeAlias):
+            return False
+        return self.subject.equals(other.subject, memo=memo)
+
     def to_string(self, memo: set) -> str:
         return f'~{self.subject.to_string(memo)}'
 
@@ -105,6 +118,39 @@ class ObjectType(Type):
         super().__init__()
         self.properties = properties or {}
         self.placeholders = placeholders or []
+
+        for ph in self.placeholders:
+            assert isinstance(ph, TypePlaceholder)
+
+    def equals(self, other, memo: dict = None) -> bool:
+        memo = memo if memo is not None else {}
+        pair = (self, other)
+        if pair in memo:
+            return memo[pair]
+
+        memo[pair] = True
+        if (
+            not isinstance(other, ObjectType) or
+            len(self.properties) != len(other.properties) or
+            len(self.placeholders) != len(other.placeholders)
+        ):
+            memo[pair] = False
+            return False
+
+        for prop_name in self.properties:
+            if (
+                (prop_name not in other.properties) or
+                self.properties[prop_name].equals(other.properties[prop_name], memo=memo)
+            ):
+                memo[pair] = False
+                return False
+
+        for i in range(len(self.placeholders)):
+            if self.placeholders[i].equals(other.placeholders[i], memo=memo):
+                memo[pair] = False
+                return False
+
+        return True
 
     def to_string(self, memo: set) -> str:
         if self.placeholders:
@@ -145,41 +191,17 @@ class FunctionType(Type):
         super().__init__()
         self.domain = domain
         self.codomain = codomain
-        self.placeholders = placeholders
+        self.placeholders = placeholders or []
+
+        for ph in self.placeholders:
+            assert isinstance(ph, TypePlaceholder)
 
     def to_string(self, memo: set) -> str:
         if self.placeholders:
-            placeholders = '[ ' + ', '.join(self.placeholders) + ' ]'
+            placeholders = '[ ' + ', '.join(map(str, self.placeholders)) + ' ]'
         else:
             placeholders = ''
         return placeholders + f'{self.domain} -> {self.codomain}'
-
-
-def specialize(generic, pattern, memo=None):
-    # Avoid infinite recursions.
-    memo = memo if memo is not None else {}
-    if generic in memo:
-        return memo[generic]
-
-    # If the generic type is a placeholder, use the pattern if possible.
-    if isinstance(generic, TypePlaceholder):
-        # Make sure the generic type is compatible with the given pattern, for every occurence of a
-        # given type placeholder.
-        if (generic in memo) and not (pattern == memo[generic]):
-            raise SpecializationError()
-        memo[generic] = pattern
-        return pattern
-
-    # If the generic type or the specialization pattern is a variable, return it.
-    if isinstance(generic, TypeVariable) or isinstance(pattern, TypeVariable):
-        return generic
-
-    if isinstance(generic, FunctionType) and isinstance(pattern, FunctionType):
-        domain = specialize(generic.domain, pattern.domain, memo=memo)
-        codomain = specialize(generic.codomain, pattern.codomain, memo=memo)
-        return FunctionType(domain=domain, codomain=codomain)
-
-    assert False
 
 
 Nothing = GroundType('Nothing')

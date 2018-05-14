@@ -110,7 +110,7 @@ class ConstraintSolver(object):
                 message=f'superfluous explicit specializations: {unspecified}')
 
         # Specialize the type on the left so that it matches that on the right.
-        specialized = types.specialize(generic=b, pattern=a)
+        specialized = self.specialize(generic=b, pattern=a)
         self.solve_equality(Constraint(
             kind=Constraint.Kind.equals,
             lhs=specialized,
@@ -132,7 +132,7 @@ class ConstraintSolver(object):
         b = self.walk(ty1)
 
         # Nothing to unify if the types are already equal.
-        if a is b:
+        if a.equals(b):
             return
 
         # If one of the types is a variable, unify it with the other.
@@ -180,7 +180,7 @@ class ConstraintSolver(object):
         b = self.walk(ty1)
 
         # If both types are equal, or if the right type is `Object` conformity always succeeds.
-        if (a is b) or (isinstance(b, types.ObjectType) and not b.properties):
+        if (a.equals(b)) or (isinstance(b, types.ObjectType) and not b.properties):
             return
 
         # If both types are object types ...
@@ -212,6 +212,63 @@ class ConstraintSolver(object):
             return
 
         assert False, f"unimplemented conformance checking between '{type(a)}' and '{type(b)}'"
+
+    def specialize(self, generic, pattern, memo=None):
+        memo = memo if memo is not None else {}
+
+        generic = self.walk(generic)
+        pattern = self.walk(pattern)
+
+        # Avoid infinite recursions.
+        if generic in memo:
+            return memo[generic]
+
+        # If the generic type is a placeholder, use the pattern if possible.
+        if isinstance(generic, types.TypePlaceholder):
+            # Make sure the generic type is compatible with the given pattern, for every occurence of a
+            # given type placeholder.
+            if (generic in memo) and not (pattern == memo[generic]):
+                raise exc.SpecializationError()
+            memo[generic] = pattern
+            return pattern
+
+        # If the generic type or the specialization pattern is a variable, return it.
+        if isinstance(generic, types.TypeVariable) or isinstance(pattern, types.TypeVariable):
+            return generic
+
+        # If both types are function types ...
+        if isinstance(generic, types.FunctionType) and isinstance(pattern, types.FunctionType):
+            domain = self.specialize(generic.domain, pattern.domain, memo=memo)
+            codomain = self.specialize(generic.codomain, pattern.codomain, memo=memo)
+            return types.FunctionType(domain=domain, codomain=codomain)
+
+        # If both types are object types ...
+        if isinstance(generic, types.ObjectType) and isinstance(pattern, types.ObjectType):
+            if len(generic.properties) != len(pattern.properties):
+                raise exc.SpecializationError()
+            properties = {}
+            for prop_name in generic.properties:
+                if not prop_name in pattern.properties:
+                    raise exc.SpecializationError()
+                properties[prop_name] = self.specialize(
+                    generic.properties[prop_name],
+                    pattern.properties[prop_name],
+                    memo=memo)
+            return types.ObjectType(properties=properties)
+
+        # If both types are lists, then we should specialize their placeholder.
+        if isinstance(generic, types.ListType) and isinstance(pattern, types.ListType):
+            ty = self.specialize(generic.element_type, pattern.element_type, memo=memo)
+            return types.ListType(
+                element_type=ty)
+
+        # If the generic type can't be further specialized, it should be equal to the pattern.
+        if isinstance(generic, types.GroundType) and isinstance(pattern, types.GroundType):
+            if generic is not pattern:
+                raise exc.SpecializationError()
+            return generic
+
+        assert False
 
     def walk(self, ty):
         if not isinstance(ty, types.TypeVariable):
