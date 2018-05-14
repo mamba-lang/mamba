@@ -52,6 +52,7 @@ class TokenKind(Enum):
     catch           = 'catch'
 
     unterminated_string_literal = 'unterminated_string_literal'
+    unterminated_comment_block  = 'unterminated_comment_block'
     unknown = 'unknown'
 
     def __str__(self):

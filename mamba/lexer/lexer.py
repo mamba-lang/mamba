@@ -98,9 +98,23 @@ class Lexer(object):
                 continue
 
             # Ignore comments.
-            if char == '#':
-                self.skip_while(lambda c: c != '\n')
-                continue
+            if char == '/':
+                next_char = self.char(1)
+                if next_char == '/':
+                    self.skip_while(lambda c: c != '\n')
+                    continue
+                if next_char == '*':
+                    self.skip(2)
+                    while (self.current_char != '*') or (self.char(1) != '/'):
+                        if self.char_index >= len(self.characters):
+                            self.skip_while(lambda _: True)
+                            yield Token(
+                                kind=TokenKind.unterminated_comment_block,
+                                source_range=SourceRange(start=start, end=copy(self.location)))
+                            return
+                        self.skip()
+                    self.skip(2)
+                    continue
 
             # Check for number literals.
             if char.isdigit():
